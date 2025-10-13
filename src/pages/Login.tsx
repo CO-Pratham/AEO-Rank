@@ -3,7 +3,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import OnboardingWizard from "@/components/onboarding/OnboardingWizard";
 
@@ -15,41 +21,63 @@ const Login = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const loginWithCredentials = (
+    email: string,
+    password: string,
+    isDemo = false
+  ) => {
     setLoading(true);
-
-    // Simulate login
     setTimeout(() => {
       if (email === "demo@aeorank.com" && password === "demo123") {
-        localStorage.setItem("aeorank_user", JSON.stringify({
-          email: "demo@aeorank.com",
-          name: "Demo User",
-          avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=demo"
-        }));
-        
-        // Check if user has completed onboarding
-        const onboardingCompleted = localStorage.getItem("aeorank_onboarding_completed");
-        
+        localStorage.setItem(
+          "aeorank_user",
+          JSON.stringify({
+            email: "demo@aeorank.com",
+            name: "Demo User",
+            avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=demo",
+          })
+        );
+
+        // For demo login, always set onboarding as completed
+        if (isDemo) {
+          localStorage.setItem("aeorank_onboarding_completed", "true");
+        }
+
+        const onboardingCompleted = localStorage.getItem(
+          "aeorank_onboarding_completed"
+        );
+
         toast({
           title: "Login Successful",
-          description: "Welcome back to AEORank!"
+          description: "Welcome back to AEORank!",
         });
-        
-        if (!onboardingCompleted) {
-          setShowOnboarding(true);
-        } else {
+
+        // If it's a demo login or onboarding is completed, go to dashboard
+        if (isDemo || onboardingCompleted) {
           navigate("/dashboard");
+        } else {
+          setShowOnboarding(true);
         }
       } else {
         toast({
           title: "Login Failed",
           description: "Invalid credentials. Use demo@aeorank.com / demo123",
-          variant: "destructive"
+          variant: "destructive",
         });
       }
       setLoading(false);
     }, 1000);
+  };
+
+  const fillDemoCredentials = () => {
+    setEmail("demo@aeorank.com");
+    setPassword("demo123");
+    loginWithCredentials("demo@aeorank.com", "demo123", true);
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    loginWithCredentials(email, password);
   };
 
   const handleOnboardingComplete = (data: any) => {
@@ -66,7 +94,9 @@ const Login = () => {
               <div className="w-8 h-8 bg-foreground rounded-sm flex items-center justify-center">
                 <span className="text-background font-bold text-sm">A</span>
               </div>
-              <span className="text-2xl font-bold text-foreground">AEORank</span>
+              <span className="text-2xl font-bold text-foreground">
+                AEORank
+              </span>
             </Link>
           </div>
 
@@ -101,9 +131,20 @@ const Login = () => {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Signing in..." : "Sign in"}
-                </Button>
+                <div className="space-y-3">
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? "Signing in..." : "Sign in"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={fillDemoCredentials}
+                    disabled={loading}
+                  >
+                    Try Demo Account
+                  </Button>
+                </div>
               </form>
 
               <div className="mt-6 text-center">
@@ -117,8 +158,10 @@ const Login = () => {
 
               <div className="mt-4 p-3 bg-muted rounded-lg">
                 <p className="text-sm text-muted-foreground text-center">
-                  <strong>Demo Credentials:</strong><br />
-                  Email: demo@aeorank.com<br />
+                  <strong>Demo Credentials:</strong>
+                  <br />
+                  Email: demo@aeorank.com
+                  <br />
                   Password: demo123
                 </p>
               </div>

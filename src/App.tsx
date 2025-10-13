@@ -7,6 +7,7 @@ import { TagsProvider } from "@/context/TagsContext";
 import { CompetitorsProvider } from "@/context/CompetitorsContext";
 import { SourcesProvider } from "@/context/SourcesContext";
 import { WorkspaceProvider } from "@/context/WorkspaceContext";
+import { BrandProvider } from "@/context/BrandContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -34,6 +35,7 @@ import WorkspacePage from "./pages/dashboard/WorkspacePage";
 import CompanyPage from "./pages/dashboard/CompanyPage";
 import SubscriptionPage from "./pages/dashboard/SubscriptionPage";
 import NotFound from "./pages/NotFound";
+import VerifyEmail from "./pages/VerifyEmail";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +45,7 @@ const App = () => (
       <TagsProvider>
         <CompetitorsProvider>
           <SourcesProvider>
+            <BrandProvider>
             <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -51,6 +54,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/verify" element={<VerifyEmail />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/demo" element={<Demo />} />
           <Route path="/pricing" element={<Pricing />} />
@@ -81,6 +85,7 @@ const App = () => (
         </Routes>
       </BrowserRouter>
             </TooltipProvider>
+            </BrandProvider>
           </SourcesProvider>
         </CompetitorsProvider>
       </TagsProvider>

@@ -59,12 +59,15 @@ const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
         </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-64 bg-white z-50" align="end" side="right" sideOffset={8}>
-        <div className="px-2 py-1.5">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <DropdownMenuItem 
+          onClick={() => navigate('/dashboard/settings')} 
+          className="cursor-pointer px-2 py-1.5"
+        >
+          <div className="flex items-center gap-2 text-sm text-muted-foreground w-full">
             <Mail className="w-4 h-4" />
-            <span className="truncate">{user.email}</span>
+            <span className="truncate">{user.email || 'No email available'}</span>
           </div>
-        </div>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         
         {workspaces.length > 0 && (

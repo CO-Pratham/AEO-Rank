@@ -42,19 +42,42 @@ export const CompetitorsProvider: React.FC<CompetitorsProviderProps> = ({ childr
     setLoading(true);
     setError(null);
     try {
-      // ====== BACKEND ENDPOINT ======
-      // TODO: Replace with your actual API endpoint
-      const response = await fetch('/api/competitors');
+      const token = localStorage.getItem('accessToken');
+      
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
+      const response = await fetch('https://aeotest-production.up.railway.app/user/competitors', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch competitors');
       }
       
       const data = await response.json();
-      setCompetitors(data);
+      
+      // Transform backend data to match frontend format
+      const transformedData = data.map((item: any, index: number) => ({
+        id: index + 1,
+        brand: item.brand || item.name || item.competitor,
+        logo: item.logo || '',
+        visibility: item.visibility || '0%',
+        sentiment: item.sentiment || 0,
+        position: item.position || `#${index + 1}`
+      }));
+      
+      setCompetitors(transformedData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       console.error('Error fetching competitors:', err);
+      // Set empty array on error
+      setCompetitors([]);
     } finally {
       setLoading(false);
     }

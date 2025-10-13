@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,31 +11,44 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { apiCall, saveToken } from "@/utils/api";
 
 const Signup = () => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleEmailSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/send-verification", {
+      const response = await fetch("https://aeotest-production.up.railway.app/send-verify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          baseurl: "http://localhost:8080", // ✅ Redirect to onboarding after verification
+        }),
       });
-
+    
       if (response.ok) {
-        setVerificationSent(true);
-        toast({
-          title: "Verification Email Sent",
-          description:
-            "Please check your email and click the verification link.",
-        });
+        const data = await response.json();
+    
+        if (data.accessToken) {
+          saveToken(data.accessToken);
+          navigate("/onboarding");
+        } else {
+          setVerificationSent(true);
+          toast({
+            title: "Verification Email Sent",
+            description: "Please check your email and click the verification link.",
+          });
+        }
       } else {
         const data = await response.json();
         toast({
@@ -53,6 +66,7 @@ const Signup = () => {
     } finally {
       setLoading(false);
     }
+    
   };
 
   return (

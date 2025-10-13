@@ -25,19 +25,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  X,
-  ChevronLeft,
-  ChevronRight,
-  Building2,
-  Users,
-  MessageSquare,
-  Globe,
-  Rocket,
-  Check,
-} from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Check, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiCall, getToken } from "@/utils/api";
 
 interface OnboardingWizardProps {
   isOpen: boolean;
@@ -49,11 +39,8 @@ interface OnboardingData {
   brandName: string;
   brandWebsite: string;
   defaultLocation: string;
-  industry: string;
   competitors: string[];
   prompts: string[];
-  country: string;
-  goals: string[];
 }
 
 const OnboardingWizard = ({
@@ -66,11 +53,8 @@ const OnboardingWizard = ({
     brandName: "",
     brandWebsite: "",
     defaultLocation: "",
-    industry: "",
     competitors: [],
     prompts: [],
-    country: "",
-    goals: [],
   });
   const [tempInput, setTempInput] = useState("");
   const [suggestedCompetitorsList, setSuggestedCompetitorsList] = useState<
@@ -79,81 +63,14 @@ const OnboardingWizard = ({
   const [suggestedPromptsList, setSuggestedPromptsList] = useState<string[]>(
     []
   );
+  const [loadingCompetitors, setLoadingCompetitors] = useState(false);
+  const [loadingPrompts, setLoadingPrompts] = useState(false);
+  const [addingCompetitor, setAddingCompetitor] = useState(false);
+  const [addingPrompt, setAddingPrompt] = useState(false);
   const { toast } = useToast();
 
-  const totalSteps = 3;
+  const totalSteps = 2;
   const progress = (currentStep / totalSteps) * 100;
-
-  useEffect(() => {
-    const fetchSuggestedCompetitors = async () => {
-      try {
-        const response = await fetch("/api/competitors/suggested");
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch suggested competitors");
-        }
-
-        const data = await response.json();
-        const competitorNames = data.map((comp: { name: string }) => comp.name);
-        setSuggestedCompetitorsList(competitorNames);
-      } catch (error) {
-        console.error("Error fetching suggested competitors:", error);
-        setSuggestedCompetitorsList(suggestedCompetitors);
-      }
-    };
-
-    const fetchSuggestedPrompts = async () => {
-      try {
-        const response = await fetch("/api/prompts/suggested");
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch suggested prompts");
-        }
-
-        const data = await response.json();
-        const promptTexts = data.map((prompt: { text: string }) => prompt.text);
-        setSuggestedPromptsList(promptTexts);
-      } catch (error) {
-        console.error("Error fetching suggested prompts:", error);
-        setSuggestedPromptsList(suggestedPrompts);
-      }
-    };
-
-    if (isOpen && currentStep === 3) {
-      fetchSuggestedCompetitors();
-    }
-
-    if (isOpen && currentStep === 2) {
-      fetchSuggestedPrompts();
-    }
-  }, [isOpen, currentStep]);
-
-  const industries = [
-    "Technology",
-    "Healthcare",
-    "Finance",
-    "E-commerce",
-    "Education",
-    "Real Estate",
-    "Travel",
-    "Food & Beverage",
-    "Fashion",
-    "Automotive",
-    "Other",
-  ];
-
-  const countries = [
-    { code: "US", name: "United States" },
-    { code: "GB", name: "United Kingdom" },
-    { code: "CA", name: "Canada" },
-    { code: "AU", name: "Australia" },
-    { code: "DE", name: "Germany" },
-    { code: "FR", name: "France" },
-    { code: "ES", name: "Spain" },
-    { code: "IT", name: "Italy" },
-    { code: "JP", name: "Japan" },
-    { code: "IN", name: "India" },
-  ];
 
   const defaultLocations = [
     "United States",
@@ -164,49 +81,127 @@ const OnboardingWizard = ({
     "India",
   ];
 
-  const suggestedPrompts = [
-    "Best project management software for teams",
-    "Top CRM solutions for small business",
-    "AI-powered marketing automation tools",
-    "Cloud storage solutions for enterprises",
-    "Customer support software comparison",
-  ];
 
-  const suggestedCompetitors = [
-    "Microsoft",
-    "Google",
-    "Amazon",
-    "Salesforce",
-    "HubSpot",
-  ];
 
-  const goalOptions = [
-    "Increase brand visibility in AI search",
-    "Monitor competitor performance",
-    "Optimize content for AI platforms",
-    "Track sentiment analysis",
-    "Improve search rankings",
-    "Generate more leads",
-  ];
+  // Fetch suggested competitors
+  useEffect(() => {
+    const fetchSuggestedCompetitors = async () => {
+      if (currentStep !== 2 || suggestedCompetitorsList.length > 0) return;
+
+      setLoadingCompetitors(true);
+      try {
+        const response = await apiCall("/competitor/generate", {
+          method: "GET",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch competitors: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (Array.isArray(data)) {
+          const competitorNames = data.map(
+            (comp: { name: string }) => comp.name
+          );
+          setSuggestedCompetitorsList(competitorNames);
+        } else {
+          throw new Error("Invalid response format");
+        }
+      } catch (error) {
+        console.error("Error fetching suggested competitors:", error);
+        toast({
+          title: "Could not load suggested competitors",
+          description: "You can still add competitors manually.",
+          variant: "destructive",
+        });
+        setSuggestedCompetitorsList([]);
+      } finally {
+        setLoadingCompetitors(false);
+      }
+    };
+
+    if (isOpen && currentStep === 2) {
+      fetchSuggestedCompetitors();
+    }
+  }, [isOpen, currentStep, suggestedCompetitorsList.length, toast]);
+
+  // Fetch suggested prompts
+  useEffect(() => {
+    const fetchSuggestedPrompts = async () => {
+      if (currentStep !== 2 || !formData.brandWebsite) return;
+
+      setLoadingPrompts(true);
+      try {
+        console.log('=== PROMPTS API CALL ===');
+        console.log('Domain:', formData.brandWebsite);
+        
+        const response = await apiCall(`/prompts/generate`, {
+          method: "POST",
+          body: JSON.stringify({
+            domain: formData.brandWebsite
+          })
+        });
+        
+        console.log('Response status:', response.status);
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch prompts: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Full API response:', JSON.stringify(data, null, 2));
+
+        if (data && data.prompts && Array.isArray(data.prompts)) {
+          const promptTexts = data.prompts.map(
+            (item: { prompt: string }) => item.prompt
+          );
+          console.log('Extracted prompts:', promptTexts);
+          setSuggestedPromptsList(promptTexts);
+        } else if (data && Array.isArray(data)) {
+          const promptTexts = data.map(
+            (item: { prompt: string }) => item.prompt
+          );
+          console.log('Extracted prompts from array:', promptTexts);
+          setSuggestedPromptsList(promptTexts);
+        } else {
+          console.log('No prompts found in response');
+          setSuggestedPromptsList([]);
+        }
+      } catch (error) {
+        console.error("Error fetching suggested prompts:", error);
+        toast({
+          title: "Could not load suggested prompts",
+          description: "You can still add prompts manually.",
+          variant: "destructive",
+        });
+        setSuggestedPromptsList([]);
+      } finally {
+        setLoadingPrompts(false);
+      }
+    };
+
+    if (isOpen && currentStep === 2 && formData.brandWebsite) {
+      fetchSuggestedPrompts();
+    }
+  }, [isOpen, currentStep, formData.brandWebsite, toast]);
 
   const handleNext = async () => {
-    // Save brand details when moving
+    // Save brand details
     if (currentStep === 1) {
       try {
-        const response = await fetch("/api/onboarding/brand-details", {
+        const response = await apiCall("/user/brand", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
-            brandName: formData.brandName,
-            brandWebsite: formData.brandWebsite,
-            defaultLocation: formData.defaultLocation,
+            brand_name: formData.brandName,
+            domain: formData.brandWebsite,
+            country: formData.defaultLocation,
           }),
         });
 
         if (!response.ok) {
-          throw new Error("Failed to save brand details");
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to save brand details");
         }
 
         toast({
@@ -214,13 +209,14 @@ const OnboardingWizard = ({
           description: "Your brand information has been saved successfully.",
         });
       } catch (error) {
+        console.error("Error saving brand details:", error);
         toast({
           title: "Error saving brand details",
           description:
             error instanceof Error ? error.message : "Please try again.",
           variant: "destructive",
         });
-        return;
+        return; // Don't proceed if save fails
       }
     }
 
@@ -235,64 +231,92 @@ const OnboardingWizard = ({
     }
   };
 
-  const addCompetitor = () => {
-    if (tempInput.trim() && !formData.competitors.includes(tempInput.trim())) {
-      setFormData({
-        ...formData,
-        competitors: [...formData.competitors, tempInput.trim()],
-      });
-      setTempInput("");
-    }
-  };
+ // const addCompetitor = async (competitorName: string) => {
+//       if (
+//           !competitorName.trim() ||
+//           formData.competitors.includes(competitorName.trim())
+//       ) {
+//           return;
+//       }
 
-  const removeCompetitor = (competitor: string) => {
+//       setAddingCompetitor(true);
+
+//       try {
+//           const response = await apiCall("/user/competitor", {
+//               method: "POST",
+//               body: JSON.stringify({
+//                   competitor: competitorName.trim(),
+//               }),
+//           });
+
+//           if (!response.ok) {
+//               const errorData = await response.json().catch(() => ({}));
+//               throw new Error(errorData.message || "Failed to add competitor");
+//           }
+
+//           setFormData({
+//               ...formData,
+//               competitors: [...formData.competitors, competitorName.trim()],
+//           });
+
+//           toast({
+//               title: "Competitor added",
+//               description: `${competitorName.trim()} has been added successfully.`,
+//           });
+//       } catch (error) {
+//           console.error("Error adding competitor:", error);
+//           toast({
+//               title: "Error adding competitor",
+//               description:
+//                   error instanceof Error ? error.message : "Please try again.",
+//               variant: "destructive",
+//           });
+//       } finally {
+//           setAddingCompetitor(false);
+    //   }
+  //   };
+
+//   const removeCompetitor = async (competitor: string) => {
+//       try {
+//           const response = await apiCall("/user/competitor", {
+//               method: "DELETE",
+//               body: JSON.stringify({
+//                   competitor: competitor,
+//               }),
+//           });
+
+//           if (!response.ok) {
+//               throw new Error("Failed to remove competitor");
+//           }
+
+//           setFormData({
+//               ...formData,
+//               competitors: formData.competitors.filter((c) => c !== competitor),
+//           });
+
+//           toast({
+//               title: "Competitor removed",
+//               description: `${competitor} has been removed.`,
+//           });
+//       } catch (error) {
+//           console.error("Error removing competitor:", error);
+//           toast({
+//               title: "Error removing competitor",
+//               description: "Please try again.",
+//               variant: "destructive",
+//           });
+    //   }
+  //   };
+
+  const addPrompt = (promptText: string) => {
+    if (!promptText.trim() || formData.prompts.includes(promptText.trim())) {
+      return;
+    }
+
     setFormData({
       ...formData,
-      competitors: formData.competitors.filter((c) => c !== competitor),
+      prompts: [...formData.prompts, promptText.trim()],
     });
-  };
-
-  const handleAddPrompt = async (promptText: string) => {
-    if (promptText.trim() && !formData.prompts.includes(promptText.trim())) {
-      try {
-        const response = await fetch("/api/prompts", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            text: promptText.trim(),
-            status: "active",
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to add prompt");
-        }
-
-        setFormData({
-          ...formData,
-          prompts: [...formData.prompts, promptText.trim()],
-        });
-
-        toast({
-          title: "Prompt added",
-          description: `Prompt has been added successfully.`,
-        });
-      } catch (error) {
-        toast({
-          title: "Error adding prompt",
-          description:
-            error instanceof Error ? error.message : "Please try again.",
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
-  const addPrompt = async () => {
-    await handleAddPrompt(tempInput);
-    setTempInput("");
   };
 
   const removePrompt = (prompt: string) => {
@@ -302,26 +326,61 @@ const OnboardingWizard = ({
     });
   };
 
-  const toggleGoal = (goal: string) => {
-    const goals = formData.goals.includes(goal)
-      ? formData.goals.filter((g) => g !== goal)
-      : [...formData.goals, goal];
-    setFormData({ ...formData, goals });
-  };
+  const handleComplete = async () => {
+    if (formData.prompts.length === 0) {
+      toast({
+        title: "No prompts added",
+        description: "Please add at least one prompt before proceeding.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  const handleComplete = () => {
-    // Store onboarding completion in localStorage
-    localStorage.setItem("aeorank_onboarding_completed", "true");
-    localStorage.setItem("aeorank_onboarding_data", JSON.stringify(formData));
+    try {
+      const promptData = {
+        prompts: formData.prompts.map(prompt => ({
+          prompt: prompt,
+          country: formData.defaultLocation
+        }))
+      };
+      
+      console.log('Sending prompts data:', promptData);
 
-    toast({
-      title: "Welcome to AEORank!",
-      description:
-        "Your account has been set up successfully. Let's start optimizing your AI search presence!",
-    });
+      const response = await apiCall("/prompts/analysis", {
+        method: "POST",
+        body: JSON.stringify(promptData),
+      });
 
-    onComplete(formData);
-    onClose();
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error:', errorData);
+        throw new Error(errorData.message || `API request failed with status ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      console.log('Success response:', responseData);
+
+      localStorage.setItem("aeorank_onboarding_completed", "true");
+
+      toast({
+        title: "Welcome to AEORank!",
+        description: "Your account has been set up successfully. Let's start optimizing your AI search presence!",
+      });
+
+      onComplete(formData);
+    } catch (error) {
+      console.error("Error analyzing prompts:", error);
+      
+      toast({
+        title: "Error saving prompts",
+        description: error instanceof Error ? error.message : "Failed to save prompts. Please try again.",
+        variant: "destructive",
+      });
+      
+      // Don't redirect on error - let user retry
+    }
   };
 
   const canProceed = () => {
@@ -334,13 +393,6 @@ const OnboardingWizard = ({
         );
       case 2:
         return formData.prompts.length > 0;
-      case 3:
-        return formData.competitors.length > 0;
-      // COMMENTED OUT - Country and goals validation
-      // case 4:
-      //   return formData.country;
-      // case 5:
-      //   return formData.goals.length > 0;
       default:
         return false;
     }
@@ -393,7 +445,7 @@ const OnboardingWizard = ({
                   <SelectTrigger>
                     <SelectValue placeholder="Select your location" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white dark:bg-gray-800">
                     {defaultLocations.map((location) => (
                       <SelectItem key={location} value={location}>
                         {location}
@@ -402,126 +454,11 @@ const OnboardingWizard = ({
                   </SelectContent>
                 </Select>
               </div>
-              {/* COMMENTED OUT - Industry field */}
-              {/*
-              <div className="space-y-2">
-                <Label htmlFor="industry">Industry *</Label>
-                <Select value={formData.industry} onValueChange={(value) => setFormData({ ...formData, industry: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select your industry" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {industries.map((industry) => (
-                      <SelectItem key={industry} value={industry}>
-                        {industry}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              */}
             </CardContent>
           </Card>
         );
 
-      case 2:
-        return (
-          <Card className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 border-purple-200 dark:border-purple-800">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                Add your prompts
-              </CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-300">
-                What prompts or queries are relevant to your business? These
-                will be monitored across AI platforms.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label>Suggested prompts</Label>
-                <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                  {(suggestedPromptsList.length > 0
-                    ? suggestedPromptsList
-                    : suggestedPrompts
-                  ).map((prompt, index) => {
-                    const isAdded = formData.prompts.includes(prompt);
-                    return (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 p-2 border rounded-lg"
-                      >
-                        <span
-                          className={`flex-1 text-sm ${
-                            isAdded ? "text-muted-foreground line-through" : ""
-                          }`}
-                        >
-                          {prompt}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-6 w-6 p-0 text-green-600 hover:bg-green-50"
-                          disabled={isAdded}
-                          onClick={() => {
-                            if (!isAdded) {
-                              handleAddPrompt(prompt);
-                            }
-                          }}
-                        >
-                          +
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="prompt">Add custom prompts</Label>
-                <div className="flex gap-2">
-                  <Textarea
-                    id="prompt"
-                    placeholder="Enter your custom prompt"
-                    value={tempInput}
-                    onChange={(e) => setTempInput(e.target.value)}
-                    rows={2}
-                  />
-                  <Button
-                    onClick={addPrompt}
-                    disabled={!tempInput.trim()}
-                    className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
-                  >
-                    Add
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Your prompts ({formData.prompts.length})</Label>
-                <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                  {formData.prompts.length === 0 ? (
-                    <p className="text-muted-foreground text-sm p-3 border rounded-md">
-                      No prompts added yet
-                    </p>
-                  ) : (
-                    formData.prompts.map((prompt, index) => (
-                      <div
-                        key={index}
-                        className="flex items-start gap-2 p-2 border rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-purple-200 dark:border-purple-700"
-                      >
-                        <span className="flex-1 text-sm">{prompt}</span>
-                        <X
-                          className="w-4 h-4 cursor-pointer hover:text-destructive flex-shrink-0 mt-0.5"
-                          onClick={() => removePrompt(prompt)}
-                        />
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      case 2:
+      /*case 2:
         return (
           <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
             <CardHeader className="text-center">
@@ -536,84 +473,56 @@ const OnboardingWizard = ({
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label>Suggested competitors</Label>
-                <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                  {(suggestedCompetitorsList.length > 0
-                    ? suggestedCompetitorsList
-                    : suggestedCompetitors
-                  ).map((competitor, index) => {
-                    const isAdded = formData.competitors.includes(competitor);
-                    return (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 p-2 border rounded-lg"
-                      >
-                        <span
-                          className={`flex-1 text-sm ${
-                            isAdded ? "text-muted-foreground line-through" : ""
-                          }`}
-                        >
-                          {competitor}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-6 w-6 p-0 text-green-600 hover:bg-green-50"
-                          disabled={isAdded}
-                          onClick={async () => {
-                            if (!isAdded) {
-                              try {
-                                const response = await fetch(
-                                  "/api/competitors",
-                                  {
-                                    method: "POST",
-                                    headers: {
-                                      "Content-Type": "application/json",
-                                    },
-                                    body: JSON.stringify({
-                                      brand: competitor,
-                                      logo: "",
-                                      visibility: "N/A",
-                                      sentiment: "N/A",
-                                      position: "N/A",
-                                    }),
-                                  }
-                                );
-
-                                if (!response.ok) {
-                                  throw new Error("Failed to add competitor");
-                                }
-
-                                setFormData({
-                                  ...formData,
-                                  competitors: [
-                                    ...formData.competitors,
-                                    competitor,
-                                  ],
-                                });
-
-                                toast({
-                                  title: "Competitor added",
-                                  description: `${competitor} has been added to your competitors list.`,
-                                });
-                              } catch (error) {
-                                toast({
-                                  title: "Error adding competitor",
-                                  description:
-                                    error instanceof Error
-                                      ? error.message
-                                      : "Please try again.",
-                                  variant: "destructive",
-                                });
-                              }
-                            }
-                          }}
-                        >
-                          +
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
+                {loadingCompetitors ? (
+                  <div className="flex items-center justify-center p-4">
+                    <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+                    <span className="ml-2 text-sm text-muted-foreground">
+                      Loading suggestions...
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                    {suggestedCompetitorsList.length > 0 ? (
+                      suggestedCompetitorsList.map((competitor, index) => {
+                        const isAdded =
+                          formData.competitors.includes(competitor);
+                        return (
+                          <div
+                            key={index}
+                            className="flex items-center gap-2 p-2 border rounded-lg"
+                          >
+                            <span
+                              className={`flex-1 text-sm ${
+                                isAdded
+                                  ? "text-muted-foreground line-through"
+                                  : ""
+                              }`}
+                            >
+                              {competitor}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 w-6 p-0 text-green-600 hover:bg-green-50"
+                              disabled={isAdded || addingCompetitor}
+                              onClick={() => addCompetitor(competitor)}
+                            >
+                              {addingCompetitor ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                "+"
+                              )}
+                            </Button>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-sm text-muted-foreground p-2">
+                        No suggestions available
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="competitor">Add custom competitors</Label>
@@ -623,14 +532,32 @@ const OnboardingWizard = ({
                     placeholder="Enter competitor name"
                     value={tempInput}
                     onChange={(e) => setTempInput(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && addCompetitor()}
+                    onKeyPress={(e) => {
+                      if (
+                        e.key === "Enter" &&
+                        tempInput.trim() &&
+                        !addingCompetitor
+                      ) {
+                        e.preventDefault();
+                        addCompetitor(tempInput);
+                        setTempInput("");
+                      }
+                    }}
+                    disabled={addingCompetitor}
                   />
                   <Button
-                    onClick={addCompetitor}
-                    disabled={!tempInput.trim()}
+                    onClick={() => {
+                      addCompetitor(tempInput);
+                      setTempInput("");
+                    }}
+                    disabled={!tempInput.trim() || addingCompetitor}
                     className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
                   >
-                    Add
+                    {addingCompetitor ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "Add"
+                    )}
                   </Button>
                 </div>
               </div>
@@ -660,9 +587,9 @@ const OnboardingWizard = ({
               </div>
             </CardContent>
           </Card>
-        );
+        );*/
 
-      case 3:
+      case 2:
         return (
           <Card className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 border-purple-200 dark:border-purple-800">
             <CardHeader className="text-center">
@@ -674,44 +601,58 @@ const OnboardingWizard = ({
                 will be monitored across AI platforms.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+              <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label>Suggested prompts</Label>
-                <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                  {(suggestedPromptsList.length > 0
-                    ? suggestedPromptsList
-                    : suggestedPrompts
-                  ).map((prompt, index) => {
-                    const isAdded = formData.prompts.includes(prompt);
-                    return (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 p-2 border rounded-lg"
-                      >
-                        <span
-                          className={`flex-1 text-sm ${
-                            isAdded ? "text-muted-foreground line-through" : ""
-                          }`}
-                        >
-                          {prompt}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-6 w-6 p-0 text-green-600 hover:bg-green-50"
-                          disabled={isAdded}
-                          onClick={() => {
-                            if (!isAdded) {
-                              handleAddPrompt(prompt);
-                            }
-                          }}
-                        >
-                          +
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
+                {loadingPrompts ? (
+                  <div className="flex items-center justify-center p-4">
+                    <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
+                    <span className="ml-2 text-sm text-muted-foreground">
+                      Loading suggestions...
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                    {suggestedPromptsList.length > 0 ? (
+                      suggestedPromptsList.map((prompt, index) => {
+                        const isAdded = formData.prompts.includes(prompt);
+                        return (
+                          <div
+                            key={index}
+                            className="flex items-center gap-2 p-2 border rounded-lg"
+                          >
+                            <span
+                              className={`flex-1 text-sm ${
+                                isAdded
+                                  ? "text-muted-foreground line-through"
+                                  : ""
+                              }`}
+                            >
+                              {prompt}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 w-6 p-0 text-green-600 hover:bg-green-50"
+                              disabled={isAdded || addingPrompt}
+                              onClick={() => addPrompt(prompt)}
+                            >
+                              {addingPrompt ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                "+"
+                              )}
+                            </Button>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-sm text-muted-foreground p-2">
+                        No suggestions available
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="prompt">Add custom prompts</Label>
@@ -722,13 +663,21 @@ const OnboardingWizard = ({
                     value={tempInput}
                     onChange={(e) => setTempInput(e.target.value)}
                     rows={2}
+                    disabled={addingPrompt}
                   />
                   <Button
-                    onClick={addPrompt}
-                    disabled={!tempInput.trim()}
+                    onClick={() => {
+                      addPrompt(tempInput);
+                      setTempInput("");
+                    }}
+                    disabled={!tempInput.trim() || addingPrompt}
                     className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
                   >
-                    Add
+                    {addingPrompt ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "Add"
+                    )}
                   </Button>
                 </div>
               </div>
@@ -758,94 +707,6 @@ const OnboardingWizard = ({
             </CardContent>
           </Card>
         );
-
-      // COMMENTED OUT - Choose your target country section
-      /*
-      case 4:
-        return (
-          <Card className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
-            <CardHeader className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <Globe className="w-8 h-8 text-white" />
-              </div>
-              <CardTitle className="text-2xl bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-                Choose your target country
-              </CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-300">
-                Which country should we focus our analysis on?
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="country">Target Country *</Label>
-                <Select
-                  value={formData.country}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, country: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select your target country" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {countries.map((country) => (
-                      <SelectItem key={country.code} value={country.code}>
-                        <div className="flex items-center gap-2">
-                          <img
-                            src={`https://flagcdn.com/w20/${country.code.toLowerCase()}.png`}
-                            alt={country.name}
-                            className="w-4 h-3"
-                          />
-                          {country.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      */
-
-      // COMMENTED OUT - What are your goals section
-      /*
-      case 5:
-        return (
-          <Card className="bg-gradient-to-br from-rose-50 to-red-50 dark:from-rose-950/30 dark:to-red-950/30 border-rose-200 dark:border-rose-800">
-            <CardHeader className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-rose-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <Rocket className="w-8 h-8 text-white" />
-              </div>
-              <CardTitle className="text-2xl bg-gradient-to-r from-rose-600 to-red-600 bg-clip-text text-transparent">
-                What are your goals?
-              </CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-300">
-                Select your primary objectives with AEORank
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-3">
-                {goalOptions.map((goal) => (
-                  <div key={goal} className="flex items-center space-x-3">
-                    <Checkbox
-                      id={goal}
-                      checked={formData.goals.includes(goal)}
-                      onCheckedChange={() => toggleGoal(goal)}
-                    />
-                    <Label
-                      htmlFor={goal}
-                      className="text-sm font-normal cursor-pointer"
-                    >
-                      {goal}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      */
 
       default:
         return null;

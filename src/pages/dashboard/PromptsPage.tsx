@@ -80,12 +80,41 @@ const PromptsPage = () => {
   const fetchActivePrompts = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/prompts/active'); // Replace with actual endpoint
-      if (!response.ok) throw new Error('Failed to fetch prompts');
+      const token = localStorage.getItem('accessToken');
+      
+      const response = await fetch('https://aeotest-production.up.railway.app/prompts/get', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch prompts: ${response.status}`);
+      }
+      
       const data = await response.json();
-      setActivePrompts(data);
+      console.log('Prompts API Response:', data);
+      
+      // Process the data to match the expected format
+      const processedPrompts = Array.isArray(data) ? data.map((item, index) => ({
+        id: item.id || index + 1,
+        prompt: item.prompt || item.question || item.text || 'No prompt text',
+        visibility: item.visibility || '0%',
+        sentiment: item.sentiment || '—',
+        position: item.position || '—',
+        mentions: item.mentions || [],
+        volume: item.volume || 0,
+        tags: item.tags || [],
+        addedAt: item.created_at ? new Date(item.created_at) : new Date()
+      })) : [];
+      
+      setActivePrompts(processedPrompts);
     } catch (error) {
       console.error('Error fetching active prompts:', error);
+      setActivePrompts([]);
     } finally {
       setLoading(false);
     }

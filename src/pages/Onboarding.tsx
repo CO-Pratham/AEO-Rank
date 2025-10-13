@@ -1,33 +1,25 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import OnboardingWizard from "@/components/onboarding/OnboardingWizard";
+import { getToken } from "@/utils/api";
 
 const Onboarding = () => {
   const [isOpen, setIsOpen] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if user is logged in
-    const user = localStorage.getItem("aeorank_user");
-    if (!user) {
-      navigate("/login");
-      return;
-    }
-
-    // Check if onboarding is already completed
-    const onboardingCompleted = localStorage.getItem("aeorank_onboarding_completed");
-    if (onboardingCompleted) {
-      navigate("/dashboard");
-    }
-  }, [navigate]);
+    // Clear any existing onboarding completion flag to allow fresh onboarding
+    localStorage.removeItem("aeorank_onboarding_completed");
+  }, []);
 
   const handleOnboardingComplete = (data: any) => {
     console.log("Onboarding completed with data:", data);
-    navigate("/dashboard");
+    localStorage.setItem("aeorank_onboarding_completed", "true");
+    navigate("/dashboard", { replace: true });
   };
 
   const handleClose = () => {
-    navigate("/dashboard");
+    navigate("/dashboard", { replace: true });
   };
 
   return (

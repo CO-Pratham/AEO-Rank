@@ -39,30 +39,40 @@ const RankingPage = () => {
       setLoading(true);
       setError(null);
       try {
-        // ====== BACKEND ENDPOINT ======
-        // TODO: Replace with your actual API endpoint
-        const response = await fetch(`/api/ranking?timeRange=${timeRange}&model=${selectedModel}`);
-        
-        // Check if response is JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          // API not implemented yet, show empty state
-          setRankingData([]);
-          setLoading(false);
-          return;
-        }
+        const token = localStorage.getItem('accessToken');
+        const response = await fetch(`https://aeotest-production.up.railway.app/analyse/brand/get`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
         
         if (!response.ok) {
           throw new Error('Failed to fetch ranking data');
         }
         
         const data = await response.json();
-        setRankingData(Array.isArray(data) ? data : []);
+        
+        if (data && Array.isArray(data) && data.length > 0) {
+          const rankingData = data
+            .sort((a, b) => b.avg_visibility - a.avg_visibility)
+            .map((item, index) => ({
+              id: index + 1,
+              brand: item.brand_name,
+              logo: '',
+              visibility: `${item.avg_visibility}%`,
+              sentiment: item.avg_sentiment,
+              position: `#${Math.round(item.avg_position)}`
+            }));
+          
+          setRankingData(rankingData);
+        } else {
+          setRankingData([]);
+        }
       } catch (err) {
-        // If API is not available, show empty state instead of error
-        console.log('API not available, showing empty state:', err);
+        console.error('Error fetching ranking data:', err);
         setRankingData([]);
-        setError(null);
+        setError('Failed to load ranking data');
       } finally {
         setLoading(false);
       }
@@ -173,7 +183,7 @@ const RankingPage = () => {
                         <Avatar className="w-6 h-6">
                           <AvatarImage src={item.logo} alt={item.brand} />
                           <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                            {item.brand.charAt(0)}
+                            {item.brand?.charAt(0) || 'B'}
                           </AvatarFallback>
                         </Avatar>
                         <span className="text-sm font-medium">{item.brand}</span>

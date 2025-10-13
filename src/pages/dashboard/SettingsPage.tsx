@@ -321,7 +321,7 @@ const SettingsPage = () => {
                 <div key={integration.key} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex items-center space-x-4">
                     <Avatar>
-                      <AvatarImage src={`https://api.dicebear.com/7.x/shapes/svg?seed=${integration.name}`} />
+                      <AvatarImage src={`${integration.name}`} />
                       <AvatarFallback>{integration.name[0]}</AvatarFallback>
                     </Avatar>
                     <div>

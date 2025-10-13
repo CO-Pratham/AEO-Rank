@@ -9,8 +9,9 @@ const DashboardLayout = () => {
 
   useEffect(() => {
     // Check if user is authenticated
-    const user = localStorage.getItem("aeorank_user");
-    setIsAuthenticated(!!user);
+    const token = localStorage.getItem("accessToken");
+    const onboardingCompleted = localStorage.getItem("aeorank_onboarding_completed");
+    setIsAuthenticated(!!(token && onboardingCompleted));
     setLoading(false);
   }, []);
 
@@ -32,7 +33,11 @@ const DashboardLayout = () => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    const token = localStorage.getItem("accessToken");
+    if (token && !localStorage.getItem("aeorank_onboarding_completed")) {
+      return <Navigate to="/onboarding" replace />;
+    }
+    return <Navigate to="/signup" replace />;
   }
 
   return (

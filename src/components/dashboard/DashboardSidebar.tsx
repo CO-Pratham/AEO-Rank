@@ -51,9 +51,25 @@ const DashboardSidebar = ({ collapsed, onToggle }: DashboardSidebarProps) => {
   const { toast } = useToast();
 
   const user = JSON.parse(localStorage.getItem("aeorank_user") || "{}");
+  
+  // Ensure email is available from various storage sources
+  if (!user.email) {
+    const email = localStorage.getItem('userEmail') || 
+                  localStorage.getItem('email') || 
+                  localStorage.getItem('signupEmail') ||
+                  localStorage.getItem('user_email');
+    if (email) {
+      user.email = email;
+      // Update the stored user object with email
+      localStorage.setItem('aeorank_user', JSON.stringify({...user, email}));
+    }
+  }
 
   const handleLogout = () => {
     localStorage.removeItem("aeorank_user");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("email");
     toast({
       title: "Logged out",
       description: "You have been successfully logged out.",
