@@ -55,6 +55,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/verify" element={<VerifyEmail />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/demo" element={<Demo />} />
           <Route path="/pricing" element={<Pricing />} />
@@ -89,7 +90,7 @@ const App = () => (
           </SourcesProvider>
         </CompetitorsProvider>
       </TagsProvider>
-    </WorkspaceProvider>
+      </WorkspaceProvider>
   </QueryClientProvider>
 );
 

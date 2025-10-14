@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Plus, LogOut, Mail } from "lucide-react";
+import { ChevronDown, Plus, LogOut, Mail, Settings, Copy, Lock, Crown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,7 +8,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { useBrand } from "@/context/BrandContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
@@ -19,10 +22,22 @@ interface WorkspaceDropdownProps {
 
 const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
   const { workspaces, currentWorkspace, setCurrentWorkspace } = useWorkspace();
+  const { brand, loading: brandLoading } = useBrand();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [showProLock, setShowProLock] = useState(false);
+
+  // Debug logging
+  console.log('WorkspaceDropdown - brand:', brand);
+  console.log('WorkspaceDropdown - currentWorkspace:', currentWorkspace);
+  console.log('WorkspaceDropdown - workspaces:', workspaces);
 
   const handleNewWorkspace = () => {
+    // Allow only one workspace on free plan; gate creating additional workspaces
+    if (workspaces.length >= 1) {
+      setShowProLock(true);
+      return;
+    }
     navigate("/dashboard/workspace?new=true");
     toast({
       title: "Create New Workspace",
@@ -38,6 +53,25 @@ const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
     });
   };
 
+  const handleCopyEmail = async () => {
+    if (user.email) {
+      try {
+        await navigator.clipboard.writeText(user.email);
+        toast({
+          title: "Email Copied",
+          description: "Email address copied to clipboard",
+        });
+      } catch (error) {
+        console.error('Failed to copy email:', error);
+        toast({
+          title: "Copy Failed",
+          description: "Failed to copy email address",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="w-full outline-none">
@@ -46,12 +80,12 @@ const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
             <Avatar className="w-8 h-8">
               <AvatarImage src={user.avatar} alt={user.name} />
               <AvatarFallback className="bg-primary text-primary-foreground">
-                {currentWorkspace?.name?.[0] || user.name?.[0] || "U"}
+                {currentWorkspace?.name?.[0] || brand?.name?.[0] || brand?.brand_name?.[0] || user.name?.[0] || "U"}
               </AvatarFallback>
             </Avatar>
             <div className="text-left">
               <p className="text-sm font-semibold text-foreground">
-                {currentWorkspace?.name || "No Workspace"}
+                {currentWorkspace?.name || brand?.name || brand?.brand_name || "No Brand"}
               </p>
             </div>
           </div>
@@ -59,13 +93,45 @@ const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
         </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-64 bg-white z-50" align="end" side="right" sideOffset={8}>
+        {/* User Email Section */}
+        <div className="px-3 py-2 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Avatar className="w-8 h-8">
+              <AvatarImage src={user.avatar} alt={user.email} />
+              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                {user.email?.[0] || "U"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1 group">
+                <Mail className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm text-foreground truncate flex-1">
+                  {user.email || 'No email available'}
+                </span>
+                {user.email && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopyEmail();
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
+                    title="Copy email"
+                  >
+                    <Copy className="w-3 h-3 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+        
         <DropdownMenuItem 
           onClick={() => navigate('/dashboard/settings')} 
-          className="cursor-pointer px-2 py-1.5"
+          className="cursor-pointer px-3 py-2"
         >
-          <div className="flex items-center gap-2 text-sm text-muted-foreground w-full">
-            <Mail className="w-4 h-4" />
-            <span className="truncate">{user.email || 'No email available'}</span>
+          <div className="flex items-center gap-2 text-sm w-full">
+            <Settings className="w-4 h-4" />
+            <span>Account Settings</span>
           </div>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -92,9 +158,17 @@ const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
           </>
         )}
         
-        <DropdownMenuItem onClick={handleNewWorkspace} className="cursor-pointer">
-          <Plus className="w-4 h-4 mr-2" />
-          New Workspace
+        {/* Always show Pro-gated New Workspace entry */}
+        <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Pro</div>
+        <DropdownMenuItem onClick={() => navigate('/dashboard/workspace?locked=1')} className="cursor-pointer opacity-80">
+          <div className="flex items-center gap-2 w-full">
+            <Lock className="w-4 h-4" />
+            <span>New Workspace</span>
+            <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              <Crown className="w-3 h-3" />
+              Pro
+            </span>
+          </div>
         </DropdownMenuItem>
         
         <DropdownMenuSeparator />
@@ -104,6 +178,28 @@ const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
           Logout
         </DropdownMenuItem>
       </DropdownMenuContent>
+
+      {/* Pro Lock Dialog */}
+      <Dialog open={showProLock} onOpenChange={setShowProLock}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-4 h-4" /> Multiple Workspaces is a Pro feature
+            </DialogTitle>
+            <DialogDescription>
+              Upgrade to Pro to create and manage multiple workspaces for different teams or brands.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <div>Free plan includes 1 workspace.</div>
+            <div>Pro unlocks unlimited workspaces, advanced collaboration, and more.</div>
+          </div>
+          <DialogFooter className="gap-2 sm:space-x-2">
+            <Button variant="outline" onClick={() => setShowProLock(false)}>Not now</Button>
+            <Button onClick={() => { setShowProLock(false); navigate('/dashboard/subscription'); }}>Upgrade to Pro</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DropdownMenu>
   );
 };

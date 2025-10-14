@@ -94,9 +94,11 @@ const DashboardOverview = () => {
         if (data && Array.isArray(data) && data.length > 0) {
           const dates = ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05', '2024-01-06', '2024-01-07'];
           const chartData = dates.map(date => {
-            const dayData = { date };
+            const dayData = { date } as Record<string, number | string>;
             data.forEach(brand => {
-              dayData[brand.brand_name] = brand.avg_visibility + Math.random() * 10 - 5; // Add some variation
+              const value = Number(brand.avg_visibility) || 0;
+              const clamped = Math.min(100, Math.max(0, value));
+              dayData[brand.brand_name] = Math.round(clamped);
             });
             return dayData;
           });
@@ -111,8 +113,8 @@ const DashboardOverview = () => {
               id: index + 1,
               brand: item.brand_name,
               logo: '',
-              visibility: `${item.avg_visibility}%`,
-              sentiment: item.avg_sentiment,
+              visibility: `${Math.round(Number(item.avg_visibility) || 0)}%`,
+              sentiment: Number.isFinite(Number(item.avg_sentiment)) ? Math.round(Number(item.avg_sentiment)) : undefined,
               position: Math.round(item.avg_position)
             }));
           
@@ -349,47 +351,63 @@ const DashboardOverview = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(competitorVisibilityData.length > 0 ? competitorVisibilityData : competitorsData).map((competitor, index) => (
-                  <TableRow
-                    key={competitor.id}
-                    className="hover:bg-muted/50 border-b last:border-0"
-                  >
-                    <TableCell className="text-xs text-muted-foreground pl-6 py-3">
-                      {index + 1}
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar className="w-6 h-6">
-                          <AvatarImage src={competitor.logo} alt={competitor.brand} />
-                          <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                            {competitor.brand?.charAt(0) || 'C'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm font-medium">
-                          {competitor.brand}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right text-sm font-semibold pr-4 py-3">
-                      {competitor.visibility}
-                    </TableCell>
-                    <TableCell className="text-right pr-4 py-3">
-                      {typeof competitor.sentiment === "number" ? (
-                        <div className="flex items-center justify-end gap-1">
-                          <div className="w-0.5 h-3.5 bg-green-500 rounded"></div>
-                          <span className="text-sm font-medium text-green-600">
-                            {competitor.sentiment}
-                          </span>
+                {(competitorVisibilityData.length > 0 ? competitorVisibilityData : competitorsData).map((competitor, index) => {
+                  const isOurBrand = competitor.brand === brand?.name;
+                  return (
+                    <TableRow
+                      key={competitor.id}
+                      className={`hover:bg-muted/50 border-b last:border-0 ${
+                        isOurBrand ? 'bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/50 dark:border-blue-800/30' : ''
+                      }`}
+                    >
+                      <TableCell className="text-xs text-muted-foreground pl-6 py-3">
+                        {index + 1}
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar className="w-6 h-6">
+                            <AvatarImage src={competitor.logo} alt={competitor.brand} />
+                            <AvatarFallback className={`text-xs font-semibold ${
+                              isOurBrand ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' : 'bg-primary/10 text-primary'
+                            }`}>
+                              {competitor.brand?.charAt(0) || 'C'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className={`text-sm font-medium ${
+                              isOurBrand ? 'text-blue-700 dark:text-blue-300' : ''
+                            }`}>
+                              {competitor.brand}
+                            </span>
+                            {isOurBrand && (
+                              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                                Our Brand
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right text-sm font-medium pr-6 py-3">
-                      {competitor.position}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-semibold pr-4 py-3">
+                        {competitor.visibility}
+                      </TableCell>
+                      <TableCell className="text-right pr-4 py-3">
+                        {typeof competitor.sentiment === "number" ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <div className="w-0.5 h-3.5 bg-green-500 rounded"></div>
+                            <span className="text-sm font-medium text-green-600">
+                              {competitor.sentiment}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium pr-6 py-3">
+                        {competitor.position}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
@@ -569,7 +587,8 @@ const DashboardOverview = () => {
                             className="w-4 h-4 rounded-sm"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
-                              e.currentTarget.nextElementSibling!.style.display = 'inline';
+                              const sibling = e.currentTarget.nextElementSibling as HTMLElement | null;
+                              if (sibling) sibling.style.display = 'inline';
                             }}
                           />
                           <span className="text-base hidden">

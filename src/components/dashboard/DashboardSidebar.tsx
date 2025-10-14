@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
@@ -23,6 +23,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import WorkspaceDropdown from "./WorkspaceDropdown";
+import { fetchUserProfile } from "@/utils/api";
+import { useBrand } from "@/context/BrandContext";
 
 const sidebarItems = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
@@ -49,21 +51,45 @@ const DashboardSidebar = ({ collapsed, onToggle }: DashboardSidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { brand } = useBrand();
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem("aeorank_user") || "{}"));
 
-  const user = JSON.parse(localStorage.getItem("aeorank_user") || "{}");
-  
-  // Ensure email is available from various storage sources
-  if (!user.email) {
-    const email = localStorage.getItem('userEmail') || 
-                  localStorage.getItem('email') || 
-                  localStorage.getItem('signupEmail') ||
-                  localStorage.getItem('user_email');
-    if (email) {
-      user.email = email;
-      // Update the stored user object with email
-      localStorage.setItem('aeorank_user', JSON.stringify({...user, email}));
-    }
-  }
+  // Fetch user data from API on component mount
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const userData = await fetchUserProfile();
+        console.log('User data from API:', userData);
+        
+        // Update user state with API data
+        const updatedUser = {
+          ...user,
+          email: userData.email || user.email,
+          name: userData.name || userData.brand_name || user.name,
+          avatar: userData.avatar || user.avatar
+        };
+        
+        setUser(updatedUser);
+        localStorage.setItem('aeorank_user', JSON.stringify(updatedUser));
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        // Fallback to existing logic if API fails
+        if (!user.email) {
+          const email = localStorage.getItem('userEmail') || 
+                        localStorage.getItem('email') || 
+                        localStorage.getItem('signupEmail') ||
+                        localStorage.getItem('user_email');
+          if (email) {
+            const updatedUser = { ...user, email };
+            setUser(updatedUser);
+            localStorage.setItem('aeorank_user', JSON.stringify(updatedUser));
+          }
+        }
+      }
+    };
+
+    fetchUserData();
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("aeorank_user");

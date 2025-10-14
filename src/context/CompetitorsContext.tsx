@@ -48,8 +48,8 @@ export const CompetitorsProvider: React.FC<CompetitorsProviderProps> = ({ childr
         throw new Error('No access token found');
       }
 
-      const response = await fetch('https://aeotest-production.up.railway.app/user/competitors', {
-        method: 'GET',
+      const response = await fetch('https://aeotest-production.up.railway.app/user/competitor', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -84,7 +84,15 @@ export const CompetitorsProvider: React.FC<CompetitorsProviderProps> = ({ childr
   };
 
   useEffect(() => {
-    fetchCompetitors();
+    // Only fetch if user is authenticated AND on a dashboard route
+    const token = localStorage.getItem('accessToken');
+    const isDashboardRoute = window.location.pathname.startsWith('/dashboard');
+    
+    if (token && isDashboardRoute) {
+      fetchCompetitors();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   const addCompetitor = async (newCompetitor: Omit<Competitor, 'id'>) => {

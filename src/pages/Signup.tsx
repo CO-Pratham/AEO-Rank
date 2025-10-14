@@ -32,7 +32,7 @@ const Signup = () => {
         },
         body: JSON.stringify({
           email,
-          baseurl: "http://localhost:8080", // ✅ Redirect to onboarding after verification
+          baseurl: "localhost:8080", 
         }),
       });
     
@@ -69,6 +69,12 @@ const Signup = () => {
     
   };
 
+  const handleGoogleOAuth = () => {
+    // Start Google OAuth via backend to avoid client_id on frontend
+    const oauthUrl = `https://aeotest-production.up.railway.app/oauth/google`;
+    window.location.href = oauthUrl;
+  };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md">
@@ -88,26 +94,48 @@ const Signup = () => {
           </CardHeader>
           <CardContent>
             {verificationSent ? (
-              <p className="text-center text-green-600">
-                Verification email sent! Check your inbox.
-              </p>
-            ) : (
-              <form onSubmit={handleEmailSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
+              <div className="space-y-4">
+                <p className="text-center text-green-600">
+                  Verification email sent! Check your inbox.
+                </p>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">or</span>
+                  </div>
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Creating account..." : "Get Started"}
+                <Button type="button" variant="outline" className="w-full" onClick={handleGoogleOAuth}>
+                  Continue with Google
                 </Button>
-              </form>
+              </div>
+            ) : (
+              <>
+                <form onSubmit={handleEmailSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email Address</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? "Creating account..." : "Get Started"}
+                  </Button>
+                </form>
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">or</span>
+                  </div>
+                </div>
+                <Button type="button" variant="outline" className="w-full" onClick={handleGoogleOAuth}>
+                  Continue with Google
+                </Button>
+              </>
             )}
 
             <div className="mt-6 text-center">
