@@ -67,6 +67,9 @@ const OnboardingWizard = ({
   const [addingCompetitor, setAddingCompetitor] = useState(false);
   const [addingPrompt, setAddingPrompt] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [isProcessingNext, setIsProcessingNext] = useState(false);
+  const [hasUserNavigatedToStep2, setHasUserNavigatedToStep2] = useState(false);
+  const [hasUserNavigatedToStep3, setHasUserNavigatedToStep3] = useState(false);
   const { toast } = useToast();
 
   const totalSteps = 3;
@@ -83,10 +86,30 @@ const OnboardingWizard = ({
 
 
 
+  // Initialize navigation flags based on current step when component mounts
+  useEffect(() => {
+    if (currentStep >= 2) {
+      setHasUserNavigatedToStep2(true);
+    }
+    if (currentStep >= 3) {
+      setHasUserNavigatedToStep3(true);
+    }
+  }, []); // Only run on mount
+
+  // Track when user navigates to each step
+  useEffect(() => {
+    if (currentStep === 2 && !hasUserNavigatedToStep2) {
+      setHasUserNavigatedToStep2(true);
+    }
+    if (currentStep === 3 && !hasUserNavigatedToStep3) {
+      setHasUserNavigatedToStep3(true);
+    }
+  }, [currentStep, hasUserNavigatedToStep2, hasUserNavigatedToStep3]);
+
   // Fetch suggested competitors using brand name and domain
   useEffect(() => {
     const fetchSuggestedCompetitors = async () => {
-      if (currentStep !== 2 || suggestedCompetitorsList.length > 0) return;
+      if (currentStep !== 2 || !hasUserNavigatedToStep2 || suggestedCompetitorsList.length > 0) return;
       if (!formData.brandName || !formData.brandWebsite) return;
 
       setLoadingCompetitors(true);
@@ -136,28 +159,29 @@ const OnboardingWizard = ({
       }
     };
 
-    if (isOpen && currentStep === 2) {
+    if (isOpen && currentStep === 2 && hasUserNavigatedToStep2) {
       fetchSuggestedCompetitors();
     }
-  }, [isOpen, currentStep, suggestedCompetitorsList.length, toast, formData.brandName, formData.brandWebsite]);
+  }, [isOpen, currentStep, hasUserNavigatedToStep2, suggestedCompetitorsList.length, toast, formData.brandName, formData.brandWebsite]);
 
   // Fetch suggested prompts
   useEffect(() => {
     const fetchSuggestedPrompts = async () => {
-      if (currentStep !== 3 || !formData.brandWebsite) return;
+      if (currentStep !== 3 || !hasUserNavigatedToStep3 || !formData.brandWebsite) return;
 
       setLoadingPrompts(true);
       try {
         console.log('=== PROMPTS API CALL ===');
         console.log('Domain:', formData.brandWebsite);
-        
+        console.log('User has navigated to step 3:', hasUserNavigatedToStep3);
+
         const response = await apiCall(`/prompts/generate`, {
           method: "POST",
           body: JSON.stringify({
             domain: formData.brandWebsite
           })
         });
-        
+
         console.log('Response status:', response.status);
 
         if (!response.ok) {
@@ -196,12 +220,14 @@ const OnboardingWizard = ({
       }
     };
 
-    if (isOpen && currentStep === 3 && formData.brandWebsite) {
+    if (isOpen && currentStep === 3 && hasUserNavigatedToStep3 && formData.brandWebsite) {
       fetchSuggestedPrompts();
     }
-  }, [isOpen, currentStep, formData.brandWebsite, toast]);
+  }, [isOpen, currentStep, hasUserNavigatedToStep3, formData.brandWebsite, toast]);
 
   const handleNext = async () => {
+    setIsProcessingNext(true);
+
     // Save brand details
     if (currentStep === 1) {
       try {
@@ -231,6 +257,7 @@ const OnboardingWizard = ({
             error instanceof Error ? error.message : "Please try again.",
           variant: "destructive",
         });
+        setIsProcessingNext(false);
         return; // Don't proceed if save fails
       }
     }
@@ -291,13 +318,24 @@ const OnboardingWizard = ({
           description: error instanceof Error ? error.message : "Please try again.",
           variant: "destructive",
         });
+        setIsProcessingNext(false);
         return; // Don't proceed if save fails
       }
     }
 
     if (currentStep < totalSteps) {
-      dispatch(setCurrentStep(currentStep + 1));
+      const nextStep = currentStep + 1;
+      dispatch(setCurrentStep(nextStep));
+
+      // Mark that user has navigated to the next step
+      if (nextStep === 2) {
+        setHasUserNavigatedToStep2(true);
+      } else if (nextStep === 3) {
+        setHasUserNavigatedToStep3(true);
+      }
     }
+
+    setIsProcessingNext(false);
   };
 
   const handlePrev = () => {
@@ -580,11 +618,20 @@ const OnboardingWizard = ({
               <div className="space-y-2">
                 <Label>Suggested competitors</Label>
                 {loadingCompetitors ? (
-                  <div className="flex items-center justify-center p-4">
-                    <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
-                    <span className="ml-2 text-sm text-muted-foreground">
-                      Loading suggestions...
-                    </span>
+                  <div className="flex items-center justify-center p-8 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 dark:bg-gradient-to-r dark:from-emerald-900/30 dark:to-teal-900/30 rounded-xl border-2 border-dashed border-emerald-300 dark:border-emerald-600">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center animate-pulse">
+                        <span className="text-white font-bold text-sm">A</span>
+                      </div>
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                        Finding your competitors...
+                      </span>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-[150px] overflow-y-auto">
@@ -746,10 +793,19 @@ const OnboardingWizard = ({
                 </Label>
                 {loadingPrompts ? (
                   <div className="flex items-center justify-center p-8 bg-gradient-to-r from-purple-50/80 to-pink-50/80 dark:bg-gradient-to-r dark:from-purple-900/30 dark:to-pink-900/30 rounded-xl border-2 border-dashed border-purple-300 dark:border-purple-600">
-                    <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
-                    <span className="ml-3 text-purple-600 dark:text-purple-400 font-medium">
-                      Loading suggestions...
-                    </span>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center animate-pulse">
+                        <span className="text-white font-bold text-sm">A</span>
+                      </div>
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                      <span className="text-purple-600 dark:text-purple-400 font-medium">
+                        Generating smart prompts...
+                      </span>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-3 max-h-[160px] overflow-y-auto bg-gradient-to-br from-white/80 to-purple-50/50 dark:from-gray-900/80 dark:to-purple-900/30 p-5 rounded-xl border-2 border-purple-100 dark:border-purple-800">
@@ -864,6 +920,32 @@ const OnboardingWizard = ({
     <>
       <Dialog open={isOpen} onOpenChange={() => {}}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-0 border-0 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl [&>button]:hidden overflow-y-auto">
+          {/* Loading Overlay */}
+          {isProcessingNext && (
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-2xl">
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-2xl text-center space-y-4">
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="w-12 h-12 bg-foreground rounded-lg flex items-center justify-center animate-pulse">
+                    <span className="text-background font-bold text-xl">A</span>
+                  </div>
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold text-foreground">Processing...</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {currentStep === 1 && "Saving your brand details"}
+                    {currentStep === 2 && "Saving your competitors"}
+                    {currentStep === 3 && "Preparing your prompts"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Header */}
           <div className="sticky top-0 z-10 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-white px-8 py-6">
             <button

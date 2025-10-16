@@ -12,23 +12,33 @@ import {
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import OnboardingWizard from "@/components/onboarding/OnboardingWizard";
+import { checkUserStatus, testUserBrandAPI } from "@/utils/api";
+import { useAppDispatch } from "@/hooks/redux";
+import { loginSuccess } from "@/store/slices/authSlice";
+import { completeOnboarding } from "@/store/slices/onboardingSlice";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+
   const navigate = useNavigate();
   const { toast } = useToast();
+  const dispatch = useAppDispatch();
 
-  const loginWithCredentials = (
+  const loginWithCredentials = async (
     email: string,
     password: string,
     isDemo = false
   ) => {
     setLoading(true);
-    setTimeout(() => {
+
+    try {
       if (email === "demo@aeorank.com" && password === "demo123") {
+        // Demo login - create demo token and user
+        const demoToken = "demo_token_" + Date.now();
+        localStorage.setItem("accessToken", demoToken);
         localStorage.setItem(
           "aeorank_user",
           JSON.stringify({
@@ -38,25 +48,36 @@ const Login = () => {
           })
         );
 
-        // For demo login, always set onboarding as completed
-        if (isDemo) {
-          localStorage.setItem("aeorank_onboarding_completed", "true");
-        }
-
-        const onboardingCompleted = localStorage.getItem(
-          "aeorank_onboarding_completed"
-        );
-
         toast({
           title: "Login Successful",
           description: "Welcome back to AEORank!",
         });
 
-        // If it's a demo login or onboarding is completed, go to dashboard
-        if (isDemo || onboardingCompleted) {
+        // Update Redux auth state
+        dispatch(loginSuccess({ token: demoToken }));
+
+        // For demo login, always set onboarding as completed and go to dashboard
+        if (isDemo) {
+          console.log("🎯 Demo login → Dashboard");
+          localStorage.setItem("aeorank_onboarding_completed", "true");
+          dispatch(completeOnboarding());
           navigate("/dashboard");
         } else {
-          setShowOnboarding(true);
+          // Check user status for regular demo login
+          console.log("🔍 Checking demo user status");
+          await testUserBrandAPI(demoToken);
+          const userStatus = await checkUserStatus(demoToken);
+          console.log("👤 Demo user status:", userStatus);
+
+          if (userStatus.hasCompletedOnboarding) {
+            console.log("✅ Demo user has completed onboarding → Dashboard");
+            localStorage.setItem("aeorank_onboarding_completed", "true");
+            dispatch(completeOnboarding());
+            navigate("/dashboard");
+          } else {
+            console.log("🆕 Demo user needs onboarding → Show wizard");
+            setShowOnboarding(true);
+          }
         }
       } else {
         toast({
@@ -65,8 +86,16 @@ const Login = () => {
           variant: "destructive",
         });
       }
+    } catch (error) {
+      console.error("Login error:", error);
+      toast({
+        title: "Login Error",
+        description: "An error occurred during login. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const fillDemoCredentials = () => {
@@ -84,6 +113,8 @@ const Login = () => {
     console.log("Onboarding completed with data:", data);
     navigate("/dashboard");
   };
+
+
 
   return (
     <>

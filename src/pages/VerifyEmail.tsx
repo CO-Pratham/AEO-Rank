@@ -1,11 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
+import { checkUserStatus } from "@/utils/api";
+import { useAppDispatch } from "@/hooks/redux";
+import { loginSuccess } from "@/store/slices/authSlice";
+import { completeOnboarding } from "@/store/slices/onboardingSlice";
 
 const VerifyEmail = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [verified, setVerified] = useState(false);
+  const dispatch = useAppDispatch();
+
 
   useEffect(() => {
     const token = searchParams.get("token");
@@ -31,7 +36,7 @@ const VerifyEmail = () => {
         console.log("Verification response:", data);
 
         if (res.ok) {
-          console.log("Full verification response:", JSON.stringify(data, null, 2));
+          console.log("📧 Full verification response:", JSON.stringify(data, null, 2));
 
           // Try different possible token field names
           const possibleToken =
@@ -40,9 +45,12 @@ const VerifyEmail = () => {
           if (possibleToken) {
             localStorage.setItem("accessToken", possibleToken);
             console.log(
-              "Token saved successfully:",
+              "🔑 Token saved successfully:",
               possibleToken.substring(0, 20) + "..."
             );
+
+            // Update Redux auth state
+            dispatch(loginSuccess({ token: possibleToken }));
           }
 
           toast({
@@ -50,9 +58,22 @@ const VerifyEmail = () => {
             description: data.message || "Email verified successfully!",
           });
 
-          // 👇 If user came via OAuth, skip brand check and go to onboarding
-          if (isOAuth) {
-            console.log("OAuth signup detected → redirecting to onboarding");
+          // 🎯 Navigate based on action field from API response
+          const action = data.action;
+          console.log("🎯 Email verification action:", action);
+
+          if (action === "login") {
+            // Existing user login - go to dashboard
+            console.log("✅ Login action detected → Dashboard");
+            try {
+              localStorage.setItem("aeorank_onboarding_completed", "true");
+              dispatch(completeOnboarding());
+            } catch {}
+            navigate("/dashboard", { replace: true });
+            return;
+          } else if (action === "signup") {
+            // New user signup - go to onboarding
+            console.log("🆕 Signup action detected → Onboarding");
             try {
               localStorage.removeItem("aeorank_onboarding_completed");
               localStorage.removeItem("aeorank_onboarding_state");
@@ -61,47 +82,36 @@ const VerifyEmail = () => {
             return;
           }
 
-          // Otherwise, check user onboarding status normally
-          const checkUserStatus = async () => {
+          // 👇 Fallback: If no action field or OAuth, use existing logic
+          if (isOAuth) {
+            console.log("🔗 OAuth signup detected → redirecting to onboarding");
             try {
-              const userResponse = await fetch(
-                "https://aeotest-production.up.railway.app/user/brand",
-                {
-                  method: "POST",
-                  headers: {
-                    Authorization: `Bearer ${possibleToken}`,
-                    "Content-Type": "application/json",
-                  },
-                }
-              );
+              localStorage.removeItem("aeorank_onboarding_completed");
+              localStorage.removeItem("aeorank_onboarding_state");
+            } catch {}
+            navigate("/onboarding?fresh=1", { replace: true });
+            return;
+          }
 
-              if (userResponse.ok) {
-                const userData = await userResponse.json();
-                // If user has brand data, they've completed onboarding
-                if (userData && (userData.brand_name || userData.name)) {
-                  try {
-                    localStorage.setItem("aeorank_onboarding_completed", "true");
-                  } catch {}
-                  navigate("/dashboard", { replace: true });
-                } else {
-                  // New user (no brand): ensure onboarding opens
-                  try {
-                    localStorage.removeItem("aeorank_onboarding_completed");
-                    localStorage.removeItem("aeorank_onboarding_state");
-                  } catch {}
-                  navigate("/onboarding?fresh=1", { replace: true });
-                }
-              } else {
-                // If no brand data exists, user needs onboarding
-                try {
-                  localStorage.removeItem("aeorank_onboarding_completed");
-                  localStorage.removeItem("aeorank_onboarding_state");
-                } catch {}
-                navigate("/onboarding?fresh=1", { replace: true });
-              }
-            } catch (error) {
-              console.error("Error checking user status:", error);
-              // Default to onboarding if check fails
+          // Fallback: If no action field, check user status (legacy support)
+          console.log("⚠️ No action field found, falling back to user status check");
+          const handleUserStatusCheck = async () => {
+            console.log("🔍 Checking user status after email verification");
+            const userStatus = await checkUserStatus(possibleToken);
+
+            console.log("👤 User status result:", userStatus);
+
+            if (userStatus.exists && userStatus.hasCompletedOnboarding) {
+              // Existing user with completed onboarding - go to dashboard
+              console.log("✅ Existing user with completed onboarding → Dashboard");
+              try {
+                localStorage.setItem("aeorank_onboarding_completed", "true");
+                dispatch(completeOnboarding());
+              } catch {}
+              navigate("/dashboard", { replace: true });
+            } else {
+              // New user or user without completed onboarding - go to onboarding
+              console.log("🆕 New user or incomplete onboarding → Onboarding");
               try {
                 localStorage.removeItem("aeorank_onboarding_completed");
                 localStorage.removeItem("aeorank_onboarding_state");
@@ -111,7 +121,7 @@ const VerifyEmail = () => {
           };
 
           if (possibleToken) {
-            checkUserStatus();
+            handleUserStatusCheck();
           } else {
             try {
               localStorage.removeItem("aeorank_onboarding_completed");
@@ -138,10 +148,22 @@ const VerifyEmail = () => {
   }, [navigate, searchParams]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center space-y-4">
-        <h1>Verifying your account...</h1>
-        <p className="text-gray-500">Please wait while we complete the process.</p>
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center space-y-6">
+        <div className="flex items-center justify-center space-x-2">
+          <div className="w-12 h-12 bg-foreground rounded-lg flex items-center justify-center animate-pulse">
+            <span className="text-background font-bold text-xl">A</span>
+          </div>
+          <div className="flex space-x-1">
+            <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+            <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+            <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold text-foreground">Verifying your account...</h1>
+          <p className="text-muted-foreground">Please wait while we complete the verification process.</p>
+        </div>
       </div>
     </div>
   );

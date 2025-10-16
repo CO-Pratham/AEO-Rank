@@ -21,22 +21,30 @@ const loadPersistedState = (): Partial<OnboardingState> | null => {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
+
+    console.log('Loading persisted onboarding state:', parsed);
+
     return {
-      data: parsed.data,
-      currentStep: parsed.currentStep,
+      data: parsed.data || {},
+      currentStep: typeof parsed.currentStep === 'number' ? parsed.currentStep : 1,
     } as Partial<OnboardingState>;
-  } catch {
+  } catch (error) {
+    console.error('Error loading persisted onboarding state:', error);
     return null;
   }
 };
 
 const persistState = (state: OnboardingState) => {
   try {
+    const stateToSave = { data: state.data, currentStep: state.currentStep };
+    console.log('Persisting onboarding state:', stateToSave);
     localStorage.setItem(
       'aeorank_onboarding_state',
-      JSON.stringify({ data: state.data, currentStep: state.currentStep })
+      JSON.stringify(stateToSave)
     );
-  } catch {}
+  } catch (error) {
+    console.error('Error persisting onboarding state:', error);
+  }
 };
 
 const initialStateBase: OnboardingState = {
@@ -55,9 +63,11 @@ const initialStateBase: OnboardingState = {
 const persisted = loadPersistedState();
 const initialState: OnboardingState = {
   ...initialStateBase,
-  ...(persisted?.data ? { data: persisted.data as OnboardingData } : {}),
-  ...(typeof persisted?.currentStep === 'number' ? { currentStep: persisted.currentStep as number } : {}),
+  ...(persisted?.data ? { data: { ...initialStateBase.data, ...persisted.data } } : {}),
+  ...(typeof persisted?.currentStep === 'number' ? { currentStep: persisted.currentStep } : {}),
 };
+
+console.log('Initial onboarding state:', initialState);
 
 const onboardingSlice = createSlice({
   name: 'onboarding',
@@ -80,7 +90,7 @@ const onboardingSlice = createSlice({
       localStorage.removeItem('aeorank_onboarding_state');
     },
     resetOnboarding: (state) => {
-      state.data = initialState.data;
+      state.data = initialStateBase.data;
       state.currentStep = 1;
       state.isCompleted = false;
       localStorage.removeItem('aeorank_onboarding_completed');

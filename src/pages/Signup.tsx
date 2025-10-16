@@ -11,7 +11,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { apiCall, saveToken } from "@/utils/api";
+import { apiCall, saveToken, testUserBrandAPI, checkUserStatus } from "@/utils/api";
+import { useAppDispatch } from "@/hooks/redux";
+import { loginSuccess } from "@/store/slices/authSlice";
+import { completeOnboarding } from "@/store/slices/onboardingSlice";
 
 const Signup = () => {
   const [email, setEmail] = useState("");
@@ -19,6 +22,7 @@ const Signup = () => {
   const [verificationSent, setVerificationSent] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
 
   const handleEmailSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -32,16 +36,66 @@ const Signup = () => {
         },
         body: JSON.stringify({
           email,
-          baseurl: "localhost:8080", 
+          baseurl: "localhost:8080",
         }),
       });
-    
+
       if (response.ok) {
         const data = await response.json();
-    
+        console.log("📧 Full signup response:", JSON.stringify(data, null, 2));
+
         if (data.accessToken) {
+          console.log("🔑 Access token received, saving and checking user status");
           saveToken(data.accessToken);
-          navigate("/onboarding");
+
+          // Update Redux auth state
+          dispatch(loginSuccess({ token: data.accessToken }));
+
+          // 🎯 Navigate based on action field from API response
+          const action = data.action;
+          console.log("🎯 Signup action:", action);
+
+          if (action === "login") {
+            // Existing user login - go to dashboard
+            console.log("✅ Login action detected → Dashboard");
+            localStorage.setItem("aeorank_onboarding_completed", "true");
+            dispatch(completeOnboarding());
+            navigate("/dashboard");
+            return;
+          } else if (action === "signup") {
+            // New user signup - go to onboarding
+            console.log("🆕 Signup action detected → Onboarding");
+            localStorage.removeItem("aeorank_onboarding_completed");
+            localStorage.removeItem("aeorank_onboarding_state");
+            navigate("/onboarding?fresh=1");
+            return;
+          }
+
+          // Fallback: If no action field, use existing logic
+          console.log("⚠️ No action field found, falling back to user status check");
+
+          // Test the API first to see what we get
+          await testUserBrandAPI(data.accessToken);
+
+          // Check if user already exists and has completed onboarding
+          const userStatus = await checkUserStatus(data.accessToken);
+
+          console.log("👤 User status result:", userStatus);
+
+          if (userStatus.exists && userStatus.hasCompletedOnboarding) {
+            // Existing user with completed onboarding - go to dashboard
+            console.log("✅ Existing user with completed onboarding → Dashboard");
+            localStorage.setItem("aeorank_onboarding_completed", "true");
+            dispatch(completeOnboarding());
+            navigate("/dashboard");
+            return;
+          } else {
+            // New user or user without completed onboarding - go to onboarding
+            console.log("🆕 New user or incomplete onboarding → Onboarding");
+            localStorage.removeItem("aeorank_onboarding_completed");
+            localStorage.removeItem("aeorank_onboarding_state");
+            navigate("/onboarding?fresh=1");
+          }
         } else {
           setVerificationSent(true);
           toast({
@@ -66,7 +120,7 @@ const Signup = () => {
     } finally {
       setLoading(false);
     }
-    
+
   };
 
   const handleGoogleOAuth = () => {
