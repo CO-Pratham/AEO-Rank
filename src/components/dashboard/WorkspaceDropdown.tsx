@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Plus, LogOut, Mail, Settings, Copy, Lock, Crown } from "lucide-react";
+import { ChevronDown, Plus, LogOut, Mail, Settings, Copy, Lock, Crown, Building2, Globe, MapPin } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,34 +78,108 @@ const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
         <div className="flex items-center justify-between p-3 bg-white hover:bg-gray-50 rounded-lg transition-colors border border-border">
           <div className="flex items-center gap-3">
             <Avatar className="w-8 h-8">
-              <AvatarImage src={user.avatar} alt={user.name} />
+              <AvatarImage 
+                src={
+                  (() => {
+                    const brandName = brand?.name || brand?.brand_name;
+                    if ((brand as any)?.logo) return (brand as any).logo;
+                    
+                    // Brand domain mapping for correct logos
+                    const brandDomainMapping: Record<string, string> = {
+                      'bajaj': 'bajajfinserv.in',
+                      'Bajaj': 'bajajfinserv.in',
+                      'BAJAJ': 'bajajfinserv.in',
+                      'bajaj finserv': 'bajajfinserv.in',
+                      'Bajaj Finserv': 'bajajfinserv.in',
+                    };
+                    
+                    if (brandName) {
+                      const mappedDomain = brandDomainMapping[brandName.toLowerCase()] || brandDomainMapping[brandName];
+                      if (mappedDomain) {
+                        return `https://www.google.com/s2/favicons?domain=${mappedDomain}&sz=64`;
+                      }
+                      return `https://www.google.com/s2/favicons?domain=${brandName.toLowerCase().replace(/\s+/g, '')}.com&sz=64`;
+                    }
+                    
+                    return user.avatar;
+                  })()
+                } 
+                alt={brand?.brand_name || brand?.name || user.name} 
+              />
               <AvatarFallback className="bg-primary text-primary-foreground">
                 {currentWorkspace?.name?.[0] || brand?.name?.[0] || brand?.brand_name?.[0] || user.name?.[0] || "U"}
               </AvatarFallback>
             </Avatar>
             <div className="text-left">
               <p className="text-sm font-semibold text-foreground">
-                {currentWorkspace?.name || brand?.name || brand?.brand_name || "No Brand"}
+                {(() => {
+                  const brandName = currentWorkspace?.name || brand?.name || brand?.brand_name;
+                  const brandNameMapping: Record<string, string> = {
+                    'bajaj': 'Bajaj Finserv',
+                    'Bajaj': 'Bajaj Finserv',
+                    'BAJAJ': 'Bajaj Finserv',
+                  };
+                  return brandName ? (brandNameMapping[brandName] || brandName) : "No Brand";
+                })()}
               </p>
             </div>
           </div>
           <ChevronDown className="w-4 h-4 text-muted-foreground" />
         </div>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-64 bg-white z-50" align="end" side="right" sideOffset={8}>
-        {/* User Email Section */}
-        <div className="px-3 py-2 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Avatar className="w-8 h-8">
-              <AvatarImage src={user.avatar} alt={user.email} />
-              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                {user.email?.[0] || "U"}
+      <DropdownMenuContent className="w-80 bg-white z-50" align="end" side="right" sideOffset={8}>
+        {/* Current Workspace/Brand Details */}
+        <div className="px-4 py-3 border-b border-border bg-gradient-to-br from-blue-50/50 to-purple-50/30">
+          <div className="flex items-start gap-3">
+            <Avatar className="w-12 h-12 border-2 border-white shadow-sm">
+              <AvatarImage 
+                src={
+                  (() => {
+                    const brandName = brand?.name || brand?.brand_name;
+                    if ((brand as any)?.logo) return (brand as any).logo;
+                    
+                    if (brandName) {
+                      const domain = brand?.website || brand?.domain || `${brandName.toLowerCase().replace(/\s+/g, '')}.com`;
+                      return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+                    }
+                    return user.avatar;
+                  })()
+                } 
+                alt={brand?.brand_name || brand?.name || user.name} 
+              />
+              <AvatarFallback className="bg-primary text-primary-foreground">
+                {brand?.name?.[0] || brand?.brand_name?.[0] || user.name?.[0] || "U"}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-bold text-foreground truncate mb-1">
+                {brand?.name || brand?.brand_name || "Your Workspace"}
+              </h3>
+              <div className="space-y-1">
+                {brand?.website && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Globe className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{brand.website}</span>
+                  </div>
+                )}
+                {brand?.location && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <MapPin className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{brand.location}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* User Email Section */}
+        <div className="px-3 py-2 border-b border-border">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1 group">
                 <Mail className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                <span className="text-sm text-foreground truncate flex-1">
+                <span className="text-xs text-muted-foreground truncate flex-1">
                   {user.email || 'No email available'}
                 </span>
                 {user.email && (

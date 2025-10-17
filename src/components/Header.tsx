@@ -8,9 +8,7 @@ const Header = () => {
           {/* Logo */}
           <div className="flex items-center">
             <a href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity" onClick={(e) => { e.preventDefault(); window.location.href = '/'; }}>
-              <div className="w-8 h-8 bg-foreground rounded-sm flex items-center justify-center">
-                <span className="text-background font-bold text-sm">A</span>
-              </div>
+              <img src="/AEO-Rank.jpeg" alt="AEO Rank Logo" className="w-8 h-8 rounded-sm object-cover" />
               <span className="text-xl font-bold text-foreground">AEORank</span>
             </a>
           </div>

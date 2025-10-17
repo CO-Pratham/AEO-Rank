@@ -13,11 +13,40 @@ interface Prompt {
   addedAt?: Date;
 }
 
+interface PromptDetail extends Prompt {
+  competitors?: Array<{
+    name: string;
+    domain: string;
+    visibility: string;
+    position: string;
+  }>;
+  analytics?: {
+    impressions: number;
+    clicks: number;
+    ctr: number;
+    avgPosition: number;
+    totalMentions: number;
+    avgSentiment: number;
+  };
+  visibilityTrend?: Array<{
+    date: string;
+    visibility: number;
+    position: number;
+  }>;
+  platformData?: Array<{
+    platform: string;
+    mentions: number;
+    color: string;
+  }>;
+}
+
 interface PromptsState {
   activePrompts: Prompt[];
   inactivePrompts: Prompt[];
   suggestedPrompts: Prompt[];
+  currentPromptDetail: PromptDetail | null;
   loading: boolean;
+  detailLoading: boolean;
   error: string | null;
 }
 
@@ -25,7 +54,9 @@ const initialState: PromptsState = {
   activePrompts: [],
   inactivePrompts: [],
   suggestedPrompts: [],
+  currentPromptDetail: null,
   loading: false,
+  detailLoading: false,
   error: null,
 };
 
@@ -35,6 +66,9 @@ const promptsSlice = createSlice({
   reducers: {
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
+    },
+    setDetailLoading: (state, action: PayloadAction<boolean>) => {
+      state.detailLoading = action.payload;
     },
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
@@ -59,11 +93,18 @@ const promptsSlice = createSlice({
     setSuggestedPrompts: (state, action: PayloadAction<Prompt[]>) => {
       state.suggestedPrompts = action.payload;
     },
+    setCurrentPromptDetail: (state, action: PayloadAction<PromptDetail | null>) => {
+      state.currentPromptDetail = action.payload;
+    },
+    clearCurrentPromptDetail: (state) => {
+      state.currentPromptDetail = null;
+    },
   },
 });
 
 export const {
   setLoading,
+  setDetailLoading,
   setError,
   setActivePrompts,
   addActivePrompt,
@@ -71,6 +112,11 @@ export const {
   setInactivePrompts,
   moveToInactive,
   setSuggestedPrompts,
+  setCurrentPromptDetail,
+  clearCurrentPromptDetail,
 } = promptsSlice.actions;
+
+// Export types for use in components
+export type { Prompt, PromptDetail };
 
 export default promptsSlice.reducer;

@@ -1,15 +1,16 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface Competitor {
   id: number;
   name: string;
+  logo?: string;
   domain?: string;
   visibility?: string;
-  sentiment?: string;
+  sentiment?: string | number;
   position?: string;
   mentions?: { platform: string; color: string }[];
   volume?: number;
-  addedAt?: Date;
+  addedAt?: string;
 }
 
 interface CompetitorsState {
@@ -27,7 +28,7 @@ const initialState: CompetitorsState = {
 };
 
 const competitorsSlice = createSlice({
-  name: 'competitors',
+  name: "competitors",
   initialState,
   reducers: {
     setLoading: (state, action: PayloadAction<boolean>) => {
@@ -43,10 +44,23 @@ const competitorsSlice = createSlice({
       state.competitors.push(action.payload);
     },
     removeCompetitor: (state, action: PayloadAction<number>) => {
-      state.competitors = state.competitors.filter(c => c.id !== action.payload);
+      state.competitors = state.competitors.filter(
+        (c) => c.id !== action.payload
+      );
     },
     setSuggestedCompetitors: (state, action: PayloadAction<Competitor[]>) => {
       state.suggestedCompetitors = action.payload;
+    },
+    removeSuggestedCompetitor: (state, action: PayloadAction<number>) => {
+      state.suggestedCompetitors = state.suggestedCompetitors.filter(
+        (c) => c.id !== action.payload
+      );
+    },
+    addCompetitorFromSuggested: (state, action: PayloadAction<Competitor>) => {
+      state.competitors.push(action.payload);
+      state.suggestedCompetitors = state.suggestedCompetitors.filter(
+        (c) => c.id !== action.payload.id
+      );
     },
   },
 });
@@ -58,6 +72,8 @@ export const {
   addCompetitor,
   removeCompetitor,
   setSuggestedCompetitors,
+  removeSuggestedCompetitor,
+  addCompetitorFromSuggested,
 } = competitorsSlice.actions;
 
 export default competitorsSlice.reducer;

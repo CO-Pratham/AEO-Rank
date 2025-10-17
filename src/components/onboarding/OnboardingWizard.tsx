@@ -925,9 +925,7 @@ const OnboardingWizard = ({
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-2xl">
               <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-2xl text-center space-y-4">
                 <div className="flex items-center justify-center space-x-2">
-                  <div className="w-12 h-12 bg-foreground rounded-lg flex items-center justify-center animate-pulse">
-                    <span className="text-background font-bold text-xl">A</span>
-                  </div>
+                  <img src="/AEO-Rank.jpeg" alt="AEO Rank Logo" className="w-12 h-12 rounded-lg object-cover animate-pulse" />
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                     <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>

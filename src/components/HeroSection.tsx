@@ -21,13 +21,7 @@ const HeroSection = () => {
         <div className="absolute top-1/3 right-1/4 w-16 h-16 bg-chart-3 rounded-full blur-xl animate-pulse-glow" style={{ animationDelay: '2s' }}></div>
       </div>
       
-      {/* Hiring Banner */}
-      <div className="max-w-7xl mx-auto text-center mb-12 relative z-10">
-        <div className="inline-flex items-center space-x-2 bg-red-50 border border-red-200 rounded-full px-4 py-2 text-sm animate-scale-in">
-          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-          <span className="text-red-700 font-medium">We are hiring</span>
-        </div>
-      </div>
+      {/* Hiring Banner removed */}
 
       <div className="max-w-4xl mx-auto text-center relative z-10">
         <div className="animate-fade-in-up">

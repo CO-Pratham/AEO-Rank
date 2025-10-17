@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +39,11 @@ import {
   Tag,
   Power,
   Trash2,
+  FileText,
+  Globe2,
+  Upload,
 } from "lucide-react";
+import { LoadingScreen } from "@/components/ui/loading-spinner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTags } from "@/context/TagsContext";
 
@@ -50,13 +55,16 @@ interface Prompt {
   position: string;
   mentions: { platform: string; color: string }[];
   volume: number;
+  volumeValue: number;
   tags: string[];
+  location: string;
   suggestedAt?: string;
   addedAt?: Date;
 }
 
 const PromptsPage = () => {
   const { incrementTagMentions } = useTags();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [timeRange, setTimeRange] = useState("7d");
   const [modelFilter, setModelFilter] = useState("all");
@@ -70,19 +78,19 @@ const PromptsPage = () => {
   const [selectedInactiveIds, setSelectedInactiveIds] = useState<number[]>([]);
   const [activePrompts, setActivePrompts] = useState<Prompt[]>([]);
   const [inactivePrompts, setInactivePrompts] = useState<Prompt[]>([]);
+  const [suggestedPrompts, setSuggestedPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(false);
+  const [suggestingLoading, setSuggestingLoading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-
-  const suggestedPrompts: Prompt[] = [];
 
   // API Functions - Backend developer should replace these endpoints
   const fetchActivePrompts = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
-      
-      const response = await fetch('https://aeotest-production.up.railway.app/prompts/get', {
+  
+      const response = await fetch('https://aeotest-production.up.railway.app/prompt/meta/get', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -90,27 +98,67 @@ const PromptsPage = () => {
         },
         mode: 'cors'
       });
-      
+  
       if (!response.ok) {
         throw new Error(`Failed to fetch prompts: ${response.status}`);
       }
-      
+  
       const data = await response.json();
-      console.log('Prompts API Response:', data);
+      console.log('Active Prompts API Response:', data);
       
       // Process the data to match the expected format
-      const processedPrompts = Array.isArray(data) ? data.map((item, index) => ({
-        id: item.id || index + 1,
-        prompt: item.prompt || item.question || item.text || 'No prompt text',
-        visibility: item.visibility || '0%',
-        sentiment: item.sentiment || '—',
-        position: item.position || '—',
-        mentions: item.mentions || [],
-        volume: item.volume || 0,
-        tags: item.tags || [],
-        addedAt: item.created_at ? new Date(item.created_at) : new Date()
-      })) : [];
+      const processedPrompts = Array.isArray(data) ? data.map((item) => {
+        // Convert mentions object to array format for UI
+        const mentionsArray = item.mentions && typeof item.mentions === 'object' ? 
+          Object.entries(item.mentions)
+            .map(([platform, count]) => {
+              const platformColors: Record<string, string> = {
+                'ChatGPT': '#10a37f',
+                'Claude': '#cc785c',
+                'Gemini': '#4285f4',
+                'Perplexity': '#1fb6ff',
+                'Freshworks': '#ff6b6b',
+                'Salesforce': '#00a1e0',
+                'Zoho': '#e42527',
+              };
+              
+              return {
+                platform,
+                color: platformColors[platform] || '#6b7280',
+                count: Number(count) || 0
+              };
+            })
+            .filter(m => m.count > 0) // Only show platforms with mentions > 0
+          : [];
+  
+        // Process tags - handle null, array, or string
+        const tagsArray = item.tags ? 
+          (Array.isArray(item.tags) ? item.tags : 
+           typeof item.tags === 'string' ? item.tags.split(',').map(t => t.trim()).filter(Boolean) : 
+           []) : [];
+  
+        // Store actual volume value for display
+        const volumeValue = Number(item.volume) || 0;
+        const volumeBars = Math.min(Math.max(Math.ceil(volumeValue / 100), 0), 5);
+  
+        return {
+          id: item.id,
+          prompt: item.prompt || 'No prompt text',
+          // Backend should provide these fields - using defaults for now
+          visibility: item.visibility !== undefined ? `${item.visibility}%` : '—',
+          sentiment: item.sentiment || '—',
+          position: item.position ? `#${item.position}` : '—',
+          mentions: mentionsArray,
+          volume: volumeBars,
+          volumeValue: volumeValue,
+          tags: tagsArray,
+          addedAt: item.added ? new Date(item.added) : new Date(),
+          location: item.location || '—'
+        };
+      }) : [];
       
+      console.log('Processed prompts:', processedPrompts);
+      console.log('Sample processed prompt:', processedPrompts[0]); // Debug first item
       setActivePrompts(processedPrompts);
     } catch (error) {
       console.error('Error fetching active prompts:', error);
@@ -122,15 +170,72 @@ const PromptsPage = () => {
 
   const createPrompt = async (promptData: Omit<Prompt, 'id'>) => {
     try {
-      const response = await fetch('/api/prompts', { // Replace with actual endpoint
+      const token = localStorage.getItem('accessToken');
+
+      // Optimistically add to UI while we await the backend
+      const optimistic: Prompt = {
+        ...promptData,
+        id: Date.now(),
+      };
+      setActivePrompts(prev => [optimistic, ...prev]);
+
+      // Map country code to full name if needed
+      const countryCodeToName: Record<string, string> = {
+        IN: 'India',
+        US: 'United States',
+        GB: 'United Kingdom',
+        CA: 'Canada',
+        AU: 'Australia',
+        DE: 'Germany',
+      };
+      const fullCountry = countryCodeToName[(promptData.location as string) || ''] || (promptData.location as string) || '';
+
+      const response = await fetch('https://aeotest-production.up.railway.app/prompt/add', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(promptData)
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+        body: JSON.stringify({
+          prompt: promptData.prompt,
+          tags: promptData.tags,
+          // Backend expects `country` with full name (e.g., "India")
+          country: fullCountry,
+          // keep location for forward-compat if backend also accepts it
+          location: fullCountry,
+          // include any other fields your backend expects
+        }),
       });
-      if (!response.ok) throw new Error('Failed to create prompt');
-      const newPrompt = await response.json();
-      setActivePrompts(prev => [newPrompt, ...prev]);
-      return newPrompt;
+
+      if (!response.ok) {
+        console.warn('Backend add prompt failed, keeping optimistic item. Status:', response.status);
+        return optimistic;
+      }
+
+      const data = await response.json();
+      // Map backend response to our Prompt shape safely
+      const created: Prompt = {
+        id: data.id ?? optimistic.id,
+        prompt: data.prompt ?? promptData.prompt,
+        visibility: data.visibility !== undefined ? `${data.visibility}%` : promptData.visibility,
+        sentiment: data.sentiment ?? promptData.sentiment,
+        position: data.position ? `#${data.position}` : promptData.position,
+        mentions: Array.isArray(promptData.mentions) ? promptData.mentions : [],
+        volume: promptData.volume,
+        volumeValue: typeof data.volume === 'number' ? data.volume : (promptData as any).volumeValue ?? 0,
+        tags: Array.isArray(data.tags) ? data.tags : promptData.tags,
+        addedAt: data.added ? new Date(data.added) : (promptData.addedAt ?? new Date()),
+        location: data.country ?? data.location ?? fullCountry,
+      };
+
+      // Replace optimistic with backend-confirmed version
+      setActivePrompts(prev => {
+        const withoutOptimistic = prev.filter(p => p.id !== optimistic.id);
+        return [created, ...withoutOptimistic];
+      });
+
+      return created;
     } catch (error) {
       console.error('Error creating prompt:', error);
       throw error;
@@ -174,12 +279,9 @@ const PromptsPage = () => {
   const handleExport = () => {
     const csvContent =
       "data:text/csv;charset=utf-8," +
-      "Prompt,Visibility,Sentiment,Position,Volume\n" +
+      "Prompt,Volume\n" +
       activePrompts
-        .map(
-          (p) =>
-            `"${p.prompt}",${p.visibility},${p.sentiment},${p.position},${p.volume}`
-        )
+        .map((p) => `"${p.prompt}",${p.volume}`)
         .join("\n");
 
     const encodedUri = encodeURI(csvContent);
@@ -209,11 +311,14 @@ const PromptsPage = () => {
         position: "—",
         mentions: [],
         volume: 0,
+        volumeValue: 0,
         tags: selectedTags,
+        // Keep UI state code value, but createPrompt will map to full country name
+        location: selectedCountry,
         addedAt: new Date(),
       };
 
-      // Send to backend
+      // Create prompt locally
       await createPrompt(newPromptData);
 
       // Increment mentions for each tag used in this prompt
@@ -225,11 +330,13 @@ const PromptsPage = () => {
       setNewPromptText("");
       setSelectedTags([]);
       setTagInput("");
+      setSelectedCountry("IN");
       setAddDialogOpen(false);
 
       // Show success message
       alert("Prompt added successfully!");
     } catch (error) {
+      console.error("Error adding prompt:", error);
       alert("Failed to add prompt. Please try again.");
     }
   };
@@ -447,6 +554,10 @@ const PromptsPage = () => {
     }
   };
 
+  if (loading) {
+    return <LoadingScreen text="Loading prompts data..." />;
+  }
+
   return (
     <div className="space-y-4 pb-8">
       {/* Header */}
@@ -557,15 +668,7 @@ const PromptsPage = () => {
                               <TableHead className="font-medium text-xs min-w-[300px] sticky left-[40px] bg-background z-10">
                                 Prompt
                               </TableHead>
-                              <TableHead className="font-medium text-xs text-center min-w-[120px]">
-                                Visibility
-                              </TableHead>
-                              <TableHead className="font-medium text-xs text-center min-w-[120px]">
-                                Sentiment
-                              </TableHead>
-                              <TableHead className="font-medium text-xs text-center min-w-[120px]">
-                                Position
-                              </TableHead>
+                              
                               <TableHead className="font-medium text-xs text-center min-w-[120px]">
                                 Mentions
                               </TableHead>
@@ -592,7 +695,42 @@ const PromptsPage = () => {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {filteredActivePrompts.length === 0 ? (
+                            {loading ? (
+                              Array.from({ length: 5 }).map((_, index) => (
+                                <TableRow key={index}>
+                                  <TableCell className="py-3">
+                                    <div className="w-4 h-4 bg-gray-200 rounded animate-pulse"></div>
+                                  </TableCell>
+                                  <TableCell className="py-3">
+                                    <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                                  </TableCell>
+                                  
+                                  <TableCell className="py-3">
+                                    <div className="flex items-center justify-center gap-1">
+                                      {Array.from({ length: 3 }).map((_, i) => (
+                                        <div key={i} className="w-5 h-5 bg-gray-200 rounded-md animate-pulse"></div>
+                                      ))}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="py-3">
+                                    <div className="flex items-center justify-center gap-0.5">
+                                      {Array.from({ length: 5 }).map((_, i) => (
+                                        <div key={i} className="w-1 h-3 bg-gray-200 rounded-sm animate-pulse"></div>
+                                      ))}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="py-3">
+                                    <div className="h-6 bg-gray-200 rounded animate-pulse mx-auto w-16"></div>
+                                  </TableCell>
+                                  <TableCell className="py-3">
+                                    <div className="h-4 bg-gray-200 rounded animate-pulse mx-auto w-8"></div>
+                                  </TableCell>
+                                  <TableCell className="py-3">
+                                    <div className="h-4 bg-gray-200 rounded animate-pulse mx-auto w-16"></div>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            ) : filteredActivePrompts.length === 0 ? (
                               <TableRow>
                                 <TableCell
                                   colSpan={10}
@@ -621,23 +759,17 @@ const PromptsPage = () => {
                                     />
                                   </TableCell>
                                   <TableCell className="py-3 sticky left-[40px] bg-background">
-                                    <p className="text-sm">{prompt.prompt}</p>
+                                    <button
+                                      onClick={() => {
+                                        console.log("Navigating to prompt:", prompt.id);
+                                        navigate(`/dashboard/prompts/${prompt.id}`);
+                                      }}
+                                      className="text-sm text-left hover:text-blue-600 hover:underline transition-colors cursor-pointer"
+                                    >
+                                      {prompt.prompt}
+                                    </button>
                                   </TableCell>
-                                  <TableCell className="text-center py-3">
-                                    <span className="text-sm font-medium">
-                                      {prompt.visibility}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="text-center py-3">
-                                    <span className="text-sm">
-                                      {prompt.sentiment}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="text-center py-3">
-                                    <span className="text-sm">
-                                      {prompt.position}
-                                    </span>
-                                  </TableCell>
+                                  
                                   <TableCell className="py-3">
                                     <div className="flex items-center justify-center gap-1">
                                       {prompt.mentions.map((mention, idx) => (
@@ -658,9 +790,9 @@ const PromptsPage = () => {
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-center py-3">
-                                    <div className="flex justify-center">
-                                      {renderVolumeIndicator(prompt.volume)}
-                                    </div>
+                                    <span className="text-sm font-medium">
+                                      {prompt.volumeValue ? prompt.volumeValue.toLocaleString() : '0'}
+                                    </span>
                                   </TableCell>
                                   <TableCell className="text-center py-3">
                                     {prompt.tags.length > 0 ? (
@@ -687,7 +819,7 @@ const PromptsPage = () => {
                                   </TableCell>
                                   <TableCell className="text-center py-3">
                                     <span className="text-sm text-muted-foreground">
-                                      —
+                                      {prompt.location !== '—' ? prompt.location : '—'}
                                     </span>
                                   </TableCell>
                                   <TableCell className="text-center py-3">
@@ -770,12 +902,20 @@ const PromptsPage = () => {
                     {filteredSuggestedPrompts.map((prompt) => (
                       <TableRow key={prompt.id} className="hover:bg-muted/50">
                         <TableCell className="py-3">
-                          <p className="text-sm">{prompt.prompt}</p>
+                          <button
+                            onClick={() => {
+                              console.log("Navigating to prompt (suggested):", prompt.id);
+                              navigate(`/dashboard/prompts/${prompt.id}`);
+                            }}
+                            className="text-sm text-left hover:text-blue-600 hover:underline transition-colors cursor-pointer"
+                          >
+                            {prompt.prompt}
+                          </button>
                         </TableCell>
                         <TableCell className="text-center py-3">
-                          <div className="flex justify-center">
-                            {renderVolumeIndicator(prompt.volume)}
-                          </div>
+                          <span className="text-sm font-medium">
+                            {prompt.volumeValue ? prompt.volumeValue.toLocaleString() : '0'}
+                          </span>
                         </TableCell>
                         <TableCell className="text-center py-3">
                           <span className="text-sm text-muted-foreground">
@@ -826,15 +966,7 @@ const PromptsPage = () => {
                             <TableHead className="font-medium text-xs min-w-[300px] sticky left-[40px] bg-background z-10">
                               Prompt
                             </TableHead>
-                            <TableHead className="font-medium text-xs text-center min-w-[120px]">
-                              Visibility
-                            </TableHead>
-                            <TableHead className="font-medium text-xs text-center min-w-[120px]">
-                              Sentiment
-                            </TableHead>
-                            <TableHead className="font-medium text-xs text-center min-w-[120px]">
-                              Position
-                            </TableHead>
+                            
                             <TableHead className="font-medium text-xs text-center min-w-[120px]">
                               Mentions
                             </TableHead>
@@ -882,21 +1014,7 @@ const PromptsPage = () => {
                               <TableCell className="py-3 sticky left-[40px] bg-background">
                                 <p className="text-sm">{prompt.prompt}</p>
                               </TableCell>
-                              <TableCell className="text-center py-3">
-                                <span className="text-sm font-medium">
-                                  {prompt.visibility}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-center py-3">
-                                <span className="text-sm">
-                                  {prompt.sentiment}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-center py-3">
-                                <span className="text-sm">
-                                  {prompt.position}
-                                </span>
-                              </TableCell>
+                              
                               <TableCell className="py-3">
                                 <div className="flex items-center justify-center gap-1">
                                   {prompt.mentions.map((mention, idx) => (
@@ -917,9 +1035,9 @@ const PromptsPage = () => {
                                 </div>
                               </TableCell>
                               <TableCell className="text-center py-3">
-                                <div className="flex justify-center">
-                                  {renderVolumeIndicator(prompt.volume)}
-                                </div>
+                                <span className="text-sm font-medium">
+                                  {prompt.volumeValue ? prompt.volumeValue.toLocaleString() : '0'}
+                                </span>
                               </TableCell>
                               <TableCell className="text-center py-3">
                                 {prompt.tags.length > 0 ? (
@@ -1050,156 +1168,222 @@ const PromptsPage = () => {
 
       {/* Add Prompt Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <div className="flex border-b">
+        <DialogContent className="max-w-2xl border-0 shadow-2xl p-0 gap-0 overflow-hidden">
+          {/* Header with gradient background */}
+          <div className="relative bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 px-8 py-8">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
+            
+            <DialogHeader className="relative space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <DialogTitle className="text-2xl font-bold text-white">
+                    Add New Prompt
+                  </DialogTitle>
+                  <p className="text-sm text-purple-100 mt-1">
+                    Track prompts and monitor their performance
+                  </p>
+                </div>
+              </div>
+            </DialogHeader>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
             <button
-              className={`flex-1 px-4 py-3 text-sm font-medium ${
+              className={`flex-1 px-6 py-4 text-sm font-semibold transition-all duration-200 relative ${
                 addPromptTab === "single"
-                  ? "border-b-2 border-blue-600 text-foreground"
-                  : "text-muted-foreground"
+                  ? "text-purple-600 dark:text-purple-400"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
               }`}
               onClick={() => setAddPromptTab("single")}
             >
-              Add Prompt
+              <div className="flex items-center justify-center gap-2">
+                <FileText className="w-4 h-4" />
+                Add Prompt
+              </div>
+              {addPromptTab === "single" && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-600 to-indigo-600"></div>
+              )}
             </button>
             <button
-              className={`flex-1 px-4 py-3 text-sm font-medium ${
+              className={`flex-1 px-6 py-4 text-sm font-semibold transition-all duration-200 relative ${
                 addPromptTab === "bulk"
-                  ? "border-b-2 border-blue-600 text-foreground"
-                  : "text-muted-foreground"
+                  ? "text-purple-600 dark:text-purple-400"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
               }`}
               onClick={() => setAddPromptTab("bulk")}
             >
-              Bulk Upload
+              <div className="flex items-center justify-center gap-2">
+                <Upload className="w-4 h-4" />
+                Bulk Upload
+              </div>
+              {addPromptTab === "bulk" && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-600 to-indigo-600"></div>
+              )}
             </button>
           </div>
 
           {addPromptTab === "single" ? (
-            <div className="space-y-4 p-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Add Prompt</h3>
-                <p className="text-sm text-muted-foreground">
-                  Create a competitive prompt without mentioning your own brand.
-                  Every line will be a separate prompt.
-                </p>
-              </div>
+            <div className="px-8 py-6 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-950">
+              <div className="space-y-6">
+                {/* Prompt Field */}
+                <div className="space-y-2.5">
+                  <Label 
+                    htmlFor="prompt" 
+                    className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2"
+                  >
+                    <FileText className="w-4 h-4 text-purple-600" />
+                    Prompt Text
+                    <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Textarea
+                      id="prompt"
+                      placeholder="What is the best insurance? (Each line will be a separate prompt)"
+                      value={newPromptText}
+                      onChange={(e) => setNewPromptText(e.target.value)}
+                      rows={4}
+                      maxLength={200}
+                      className="resize-none text-base border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all duration-200 rounded-xl"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 pl-1">
+                      <span className="w-1 h-1 rounded-full bg-purple-500"></span>
+                      Create competitive prompts without mentioning your brand
+                    </p>
+                    <span className="text-xs font-medium text-gray-500">
+                      {newPromptText.length}/200
+                    </span>
+                  </div>
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="prompt" className="text-sm font-medium">
-                  Prompt
-                </Label>
-                <Textarea
-                  id="prompt"
-                  placeholder="What is the best insurance?"
-                  value={newPromptText}
-                  onChange={(e) => setNewPromptText(e.target.value)}
-                  rows={3}
-                  maxLength={200}
-                  className="resize-none text-sm"
-                />
-                <div className="text-right text-xs text-muted-foreground">
-                  {newPromptText.length}/200
+                {/* Country Field */}
+                <div className="space-y-2.5">
+                  <Label 
+                    htmlFor="country" 
+                    className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2"
+                  >
+                    <Globe2 className="w-4 h-4 text-blue-600" />
+                    IP Address Region
+                  </Label>
+                  <Select
+                    value={selectedCountry}
+                    onValueChange={setSelectedCountry}
+                  >
+                    <SelectTrigger id="country" className="h-12 border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 rounded-xl">
+                      <SelectValue>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇮🇳</span>
+                          <span>India</span>
+                        </div>
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="IN">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇮🇳</span>
+                          <span>India</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="US">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇺🇸</span>
+                          <span>United States</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="GB">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇬🇧</span>
+                          <span>United Kingdom</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 pl-1">
+                    <span className="w-1 h-1 rounded-full bg-blue-500"></span>
+                    Select the region for prompt analysis
+                  </p>
+                </div>
+
+                {/* Tags Field */}
+                <div className="space-y-2.5">
+                  <Label 
+                    htmlFor="tags" 
+                    className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2"
+                  >
+                    <Tag className="w-4 h-4 text-green-600" />
+                    Tags
+                    <span className="text-xs font-normal text-gray-500">(Optional)</span>
+                  </Label>
+                  {selectedTags.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                      {selectedTags.map((tag, idx) => (
+                        <Badge key={idx} variant="secondary" className="text-xs px-3 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                          {tag}
+                          <button
+                            onClick={() => handleRemoveTag(tag)}
+                            className="ml-1.5 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="tags"
+                      placeholder="Enter tag name and press Enter"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddTag();
+                        }
+                      }}
+                      className="flex-1 h-12 border-2 border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all duration-200 rounded-xl"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-12 w-12 rounded-xl border-2 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all"
+                      onClick={handleAddTag}
+                      type="button"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 pl-1">
+                    <span className="w-1 h-1 rounded-full bg-green-500"></span>
+                    Add tags to organize and categorize your prompts
+                  </p>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="country" className="text-sm font-medium">
-                  IP Address
-                </Label>
-                <Select
-                  value={selectedCountry}
-                  onValueChange={setSelectedCountry}
-                >
-                  <SelectTrigger id="country">
-                    <SelectValue>
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">🇮🇳</span>
-                        <span>India</span>
-                      </div>
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="IN">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">🇮🇳</span>
-                        <span>India</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="US">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">🇺🇸</span>
-                        <span>United States</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="GB">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">🇬🇧</span>
-                        <span>United Kingdom</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="tags" className="text-sm font-medium">
-                  Tags
-                </Label>
-                {selectedTags.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap mb-2">
-                    {selectedTags.map((tag, idx) => (
-                      <Badge key={idx} variant="secondary" className="text-xs">
-                        {tag}
-                        <button
-                          onClick={() => handleRemoveTag(tag)}
-                          className="ml-1 hover:text-destructive"
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="tags"
-                    placeholder="Enter tag name"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddTag();
-                      }
-                    }}
-                    className="flex-1"
-                  />
+              {/* Footer */}
+              <div className="px-8 py-6 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800">
+                <DialogFooter className="gap-3 sm:gap-3">
                   <Button
                     variant="outline"
-                    size="icon"
-                    className="h-10 w-10"
-                    onClick={handleAddTag}
-                    type="button"
+                    onClick={() => setAddDialogOpen(false)}
+                    className="h-11 px-6 rounded-xl border-2 hover:bg-gray-50 dark:hover:bg-gray-900 transition-all duration-200 font-medium"
                   >
-                    <Plus className="w-4 h-4" />
+                    Cancel
                   </Button>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setAddDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleAddPrompt}
-                  className="bg-black hover:bg-black/90 text-white"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add
-                </Button>
+                  <Button
+                    onClick={handleAddPrompt}
+                    className="h-11 px-8 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-500/30 hover:shadow-xl hover:shadow-purple-500/40 transition-all duration-200 font-semibold"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Prompt
+                  </Button>
+                </DialogFooter>
               </div>
             </div>
           ) : (

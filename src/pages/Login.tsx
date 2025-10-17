@@ -122,9 +122,7 @@ const Login = () => {
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <Link to="/" className="inline-flex items-center space-x-2">
-              <div className="w-8 h-8 bg-foreground rounded-sm flex items-center justify-center">
-                <span className="text-background font-bold text-sm">A</span>
-              </div>
+              <img src="/AEO-Rank.jpeg" alt="AEO Rank Logo" className="w-8 h-8 rounded-sm object-cover" />
               <span className="text-2xl font-bold text-foreground">
                 AEORank
               </span>

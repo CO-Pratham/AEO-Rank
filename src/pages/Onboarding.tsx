@@ -55,9 +55,7 @@ const Onboarding = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-foreground rounded-sm flex items-center justify-center animate-pulse">
-            <span className="text-background font-bold text-sm">A</span>
-          </div>
+          <img src="/AEO-Rank.jpeg" alt="AEO Rank Logo" className="w-8 h-8 rounded-sm object-cover animate-pulse" />
           <span className="text-lg font-bold text-foreground">Loading...</span>
         </div>
       </div>

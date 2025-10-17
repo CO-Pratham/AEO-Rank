@@ -17,6 +17,7 @@ import {
   Swords,
   Lightbulb,
   TrendingUp,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -52,7 +53,15 @@ const DashboardSidebar = ({ collapsed, onToggle }: DashboardSidebarProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { brand } = useBrand();
-  const [user, setUser] = useState(JSON.parse(localStorage.getItem("aeorank_user") || "{}"));
+  const [user, setUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem("aeorank_user");
+      return savedUser ? JSON.parse(savedUser) : { email: '', name: 'User', avatar: '' };
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      return { email: '', name: 'User', avatar: '' };
+    }
+  });
 
   // Fetch user data from API on component mount
   useEffect(() => {
@@ -63,10 +72,9 @@ const DashboardSidebar = ({ collapsed, onToggle }: DashboardSidebarProps) => {
         
         // Update user state with API data
         const updatedUser = {
-          ...user,
-          email: userData.email || user.email,
-          name: userData.name || userData.brand_name || user.name,
-          avatar: userData.avatar || user.avatar
+          email: userData.email || localStorage.getItem('userEmail') || localStorage.getItem('email') || '',
+          name: userData.name || userData.brand_name || 'User',
+          avatar: userData.avatar || ''
         };
         
         setUser(updatedUser);
@@ -74,21 +82,22 @@ const DashboardSidebar = ({ collapsed, onToggle }: DashboardSidebarProps) => {
       } catch (error) {
         console.error('Error fetching user data:', error);
         // Fallback to existing logic if API fails
-        if (!user.email) {
-          const email = localStorage.getItem('userEmail') || 
-                        localStorage.getItem('email') || 
-                        localStorage.getItem('signupEmail') ||
-                        localStorage.getItem('user_email');
-          if (email) {
-            const updatedUser = { ...user, email };
-            setUser(updatedUser);
-            localStorage.setItem('aeorank_user', JSON.stringify(updatedUser));
-          }
-        }
+        const email = localStorage.getItem('userEmail') || 
+                      localStorage.getItem('email') || 
+                      localStorage.getItem('signupEmail') ||
+                      localStorage.getItem('user_email') || '';
+        const fallbackUser = {
+          email: email,
+          name: 'User',
+          avatar: ''
+        };
+        setUser(fallbackUser);
+        localStorage.setItem('aeorank_user', JSON.stringify(fallbackUser));
       }
     };
 
     fetchUserData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLogout = () => {
@@ -115,18 +124,16 @@ const DashboardSidebar = ({ collapsed, onToggle }: DashboardSidebarProps) => {
         <div className="flex items-center justify-between">
           {!collapsed && (
             <Link to="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-foreground rounded-sm flex items-center justify-center">
-                <span className="text-background font-bold text-sm">A</span>
-              </div>
+              <img src="/AEO-Rank.jpeg" alt="AEORank" className="w-8 h-8 rounded-sm object-cover" />
               <span className="text-lg font-bold text-foreground">AEORank</span>
             </Link>
           )}
           {collapsed && (
             <Link
               to="/"
-              className="w-8 h-8 bg-foreground rounded-sm flex items-center justify-center mx-auto"
+              className="flex items-center justify-center mx-auto"
             >
-              <span className="text-background font-bold text-sm">A</span>
+              <img src="/aeorank.jpeg" alt="AEORank" className="w-8 h-8 rounded-sm object-cover" />
             </Link>
           )}
         </div>
@@ -194,20 +201,34 @@ const DashboardSidebar = ({ collapsed, onToggle }: DashboardSidebarProps) => {
         })}
         {sidebarItems.slice(1, 5).map((item) => {
           const isActive = location.pathname === item.href;
+          const isPromptDetailActive = item.href === "/dashboard/prompts" && location.pathname.startsWith("/dashboard/prompts/");
+
           return (
-            <Link
-              key={item.name}
-              to={item.href}
-              className={cn(
-                "flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            <div key={item.name}>
+              <Link
+                to={item.href}
+                className={cn(
+                  "flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  isActive || isPromptDetailActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <item.icon className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && <span className="ml-3">{item.name}</span>}
+              </Link>
+
+              {/* Prompt Detail Sub-item */}
+              {!collapsed && item.href === "/dashboard/prompts" && location.pathname.startsWith("/dashboard/prompts/") && (
+                <Link
+                  to={location.pathname}
+                  className="flex items-center px-3 py-2 ml-8 rounded-lg text-sm font-medium transition-colors bg-muted"
+                >
+                  <MessageSquare className="w-4 h-4 flex-shrink-0" />
+                  <span className="ml-2">Prompt Detail</span>
+                </Link>
               )}
-            >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
-              {!collapsed && <span className="ml-3">{item.name}</span>}
-            </Link>
+            </div>
           );
         })}
 

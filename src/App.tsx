@@ -26,6 +26,7 @@ import DashboardLayout from "./components/dashboard/DashboardLayout";
 import DashboardOverview from "./pages/dashboard/DashboardOverview";
 import RankingPage from "./pages/dashboard/RankingPage";
 import PromptsPage from "./pages/dashboard/PromptsPage";
+import PromptDetailPage from "./pages/dashboard/PromptDetailPage";
 import SourcesPage from "./pages/dashboard/SourcesPage";
 import CompetitorsPage from "./pages/dashboard/CompetitorsPage";
 import TagsPage from "./pages/dashboard/TagsPage";
@@ -36,6 +37,7 @@ import CompanyPage from "./pages/dashboard/CompanyPage";
 import SubscriptionPage from "./pages/dashboard/SubscriptionPage";
 import NotFound from "./pages/NotFound";
 import VerifyEmail from "./pages/VerifyEmail";
+import OAuthCallback from "./pages/OAuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +56,8 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/oauth-callback" element={<OAuthCallback />} />
+          <Route path="/oauth/callback" element={<OAuthCallback />} />
           <Route path="/verify" element={<VerifyEmail />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/onboarding" element={<Onboarding />} />
@@ -70,6 +74,7 @@ const App = () => (
             <Route index element={<DashboardOverview />} />
             <Route path="ranking" element={<RankingPage />} />
             <Route path="prompts" element={<PromptsPage />} />
+            <Route path="prompts/:id" element={<PromptDetailPage />} />
             <Route path="sources" element={<SourcesPage />} />
             <Route path="best-practices" element={<BestPractices />} />
             <Route path="recommendations" element={<Recommendations />} />
@@ -83,6 +88,7 @@ const App = () => (
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
+
         </Routes>
       </BrowserRouter>
             </TooltipProvider>

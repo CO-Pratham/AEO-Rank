@@ -61,7 +61,9 @@ const VerifyEmail = () => {
           // 🎯 Navigate based on action field from API response
           const action = data.action;
           console.log("🎯 Email verification action:", action);
+          console.log("📋 Full verification data:", data);
 
+          // Primary: Use action field from backend (most reliable)
           if (action === "login") {
             // Existing user login - go to dashboard
             console.log("✅ Login action detected → Dashboard");
@@ -82,9 +84,9 @@ const VerifyEmail = () => {
             return;
           }
 
-          // 👇 Fallback: If no action field or OAuth, use existing logic
-          if (isOAuth) {
-            console.log("🔗 OAuth signup detected → redirecting to onboarding");
+          // Secondary: Check if backend explicitly says it's a new user
+          if (data.isNewUser === true || data.new_user === true || data.newUser === true) {
+            console.log("🆕 New user flag detected → Onboarding");
             try {
               localStorage.removeItem("aeorank_onboarding_completed");
               localStorage.removeItem("aeorank_onboarding_state");
@@ -93,25 +95,49 @@ const VerifyEmail = () => {
             return;
           }
 
-          // Fallback: If no action field, check user status (legacy support)
-          console.log("⚠️ No action field found, falling back to user status check");
+          // Tertiary: OAuth special handling
+          if (isOAuth) {
+            console.log("🔗 OAuth signup detected → Onboarding");
+            try {
+              localStorage.removeItem("aeorank_onboarding_completed");
+              localStorage.removeItem("aeorank_onboarding_state");
+            } catch {}
+            navigate("/onboarding?fresh=1", { replace: true });
+            return;
+          }
+
+          // Final fallback: Check user status via API
+          console.log("⚠️ No action/newUser field found, checking user status");
           const handleUserStatusCheck = async () => {
+            if (!possibleToken) {
+              console.log("❌ No token available → Onboarding");
+              try {
+                localStorage.removeItem("aeorank_onboarding_completed");
+                localStorage.removeItem("aeorank_onboarding_state");
+              } catch {}
+              navigate("/onboarding?fresh=1", { replace: true });
+              return;
+            }
+
             console.log("🔍 Checking user status after email verification");
             const userStatus = await checkUserStatus(possibleToken);
-
             console.log("👤 User status result:", userStatus);
 
-            if (userStatus.exists && userStatus.hasCompletedOnboarding) {
-              // Existing user with completed onboarding - go to dashboard
-              console.log("✅ Existing user with completed onboarding → Dashboard");
+            // Check if user has brand_name specifically (indicates completed onboarding)
+            const hasBrandSetup = userStatus.userData && (
+              userStatus.userData.brand_name || 
+              userStatus.userData.brandName
+            );
+
+            if (userStatus.exists && hasBrandSetup) {
+              console.log("✅ Existing user with brand setup → Dashboard");
               try {
                 localStorage.setItem("aeorank_onboarding_completed", "true");
                 dispatch(completeOnboarding());
               } catch {}
               navigate("/dashboard", { replace: true });
             } else {
-              // New user or user without completed onboarding - go to onboarding
-              console.log("🆕 New user or incomplete onboarding → Onboarding");
+              console.log("🆕 New user or no brand setup → Onboarding");
               try {
                 localStorage.removeItem("aeorank_onboarding_completed");
                 localStorage.removeItem("aeorank_onboarding_state");
@@ -120,15 +146,7 @@ const VerifyEmail = () => {
             }
           };
 
-          if (possibleToken) {
-            handleUserStatusCheck();
-          } else {
-            try {
-              localStorage.removeItem("aeorank_onboarding_completed");
-              localStorage.removeItem("aeorank_onboarding_state");
-            } catch {}
-            navigate("/onboarding?fresh=1", { replace: true });
-          }
+          handleUserStatusCheck();
         } else {
           toast({
             title: "Verification Failed",
@@ -151,9 +169,7 @@ const VerifyEmail = () => {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center space-y-6">
         <div className="flex items-center justify-center space-x-2">
-          <div className="w-12 h-12 bg-foreground rounded-lg flex items-center justify-center animate-pulse">
-            <span className="text-background font-bold text-xl">A</span>
-          </div>
+          <img src="/AEO-Rank.jpeg" alt="AEO Rank Logo" className="w-12 h-12 rounded-lg object-cover animate-pulse" />
           <div className="flex space-x-1">
             <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
             <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>

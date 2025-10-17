@@ -39,6 +39,7 @@ import {
   X,
   Globe,
 } from "lucide-react";
+import { LoadingScreen } from "@/components/ui/loading-spinner";
 import { sourcesData } from "@/utils/mockData";
 import {
   ChartContainer,
@@ -70,7 +71,7 @@ const SourcesPage = () => {
   const [urlPerformanceData, setUrlPerformanceData] = useState<any[]>([]);
   const [urlSourcesData, setUrlSourcesData] = useState<any[]>([]);
 
-  const { sourcesTypeData, topSourcesData, totalSources } = useSources();
+  const { sourcesTypeData, topSourcesData, totalSources, loading } = useSources();
 
   useEffect(() => {
     if (topSourcesData && topSourcesData.length > 0) {
@@ -221,6 +222,10 @@ const SourcesPage = () => {
     }
   };
 
+  if (loading) {
+    return <LoadingScreen text="Loading sources data..." />;
+  }
+
   return (
     <div className="space-y-6">
       {/* Domains/URLs Toggle Section */}
@@ -279,7 +284,17 @@ const SourcesPage = () => {
                     return (
                       <div key={source.domain} className="flex items-center gap-1.5">
                         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors[index] }} />
-                        <span className="text-xs">{source.domain}</span>
+                        <a
+                          href={`https://${source.domain}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:text-blue-700 hover:underline transition-colors cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                        >
+                          {source.domain}
+                        </a>
                       </div>
                     );
                   }) : (
@@ -491,10 +506,35 @@ const SourcesPage = () => {
                     >
                       <TableCell className="py-3 pl-6">
                         <div className="flex items-center gap-2">
-                          <span className="text-base">{source.icon}</span>
-                          <span className="text-sm font-medium">
+                          <div className="w-4 h-4 rounded-sm bg-muted/30 flex items-center justify-center">
+                            <img
+                              src={source.icon}
+                              alt={source.domain}
+                              className="w-4 h-4 rounded-sm"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                                const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                                if (fallback) fallback.style.display = "flex";
+                              }}
+                            />
+                            <span 
+                              className="text-xs font-semibold text-muted-foreground hidden"
+                              style={{ display: 'none' }}
+                            >
+                              {source.domain?.charAt(0).toUpperCase() || "D"}
+                            </span>
+                          </div>
+                          <a
+                            href={`https://${source.domain}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                            }}
+                          >
                             {source.domain}
-                          </span>
+                          </a>
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-sm font-semibold py-3">

@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -17,6 +19,10 @@ import {
 } from "@/components/ui/table";
 import { BarChart3 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { LoadingScreen } from "@/components/ui/loading-spinner";
+import { RootState, AppDispatch } from "@/store";
+import { setLoading, setError, setRankingData, setPromptRankingData } from "@/store/slices/rankingSlice";
+import { processRankingData, getRankingData, isRankingDataFresh } from "@/utils/rankingUtils";
 
 interface RankingItem {
   id: number;
@@ -28,19 +34,38 @@ interface RankingItem {
 }
 
 const RankingPage = () => {
+  const dispatch = useDispatch<AppDispatch>();
+  const [searchParams] = useSearchParams();
+  const promptId = searchParams.get('prompt_id');
+  
   const [timeRange, setTimeRange] = useState("7d");
   const [selectedModel, setSelectedModel] = useState("all");
-  const [rankingData, setRankingData] = useState<RankingItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Get data from Redux store
+  const { rankingData, promptRankingData, loading, error, lastUpdated, promptId: storePromptId } = useSelector((state: RootState) => state.ranking);
+  
+  // Use appropriate data based on promptId
+  const currentRankingData = promptId && storePromptId === promptId ? promptRankingData : rankingData;
 
   useEffect(() => {
     const fetchRankingData = async () => {
-      setLoading(true);
-      setError(null);
+      // Check if we have fresh data in Redux store for the correct context (general or prompt-specific)
+      const isCorrectContext = promptId ? (storePromptId === promptId) : (storePromptId === null);
+      if (currentRankingData.length > 0 && isRankingDataFresh(lastUpdated) && isCorrectContext) {
+        return; // Use cached data
+      }
+
+      dispatch(setLoading(true));
+      dispatch(setError(null));
+      
       try {
         const token = localStorage.getItem('accessToken');
-        const response = await fetch(`https://aeotest-production.up.railway.app/analyse/brand/get`, {
+        // Use prompt-specific endpoint if prompt_id is provided, otherwise use general endpoint
+        const url = promptId 
+          ? `https://aeotest-production.up.railway.app/analyse/brand/prompt/get?prompt_id=${promptId}`
+          : `https://aeotest-production.up.railway.app/analyse/brand/get`;
+        
+        const response = await fetch(url, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -52,34 +77,39 @@ const RankingPage = () => {
         }
         
         const data = await response.json();
+        console.log('Fetched ranking data:', data);
         
         if (data && Array.isArray(data) && data.length > 0) {
-          const rankingData = data
-            .sort((a, b) => b.avg_visibility - a.avg_visibility)
-            .map((item, index) => ({
-              id: index + 1,
-              brand: item.brand_name,
-              logo: '',
-              visibility: `${item.avg_visibility}%`,
-              sentiment: item.avg_sentiment,
-              position: `#${Math.round(item.avg_position)}`
-            }));
+          // Use the new ranking utility for proper processing
+          const processedData = processRankingData(data, !!promptId);
+          console.log('Processed ranking data:', processedData);
           
-          setRankingData(rankingData);
+          if (promptId) {
+            dispatch(setPromptRankingData({ promptId, data: processedData }));
+          } else {
+            dispatch(setRankingData(processedData));
+          }
         } else {
-          setRankingData([]);
+          if (promptId) {
+            dispatch(setPromptRankingData({ promptId, data: [] }));
+          } else {
+            dispatch(setRankingData([]));
+          }
         }
       } catch (err) {
         console.error('Error fetching ranking data:', err);
-        setRankingData([]);
-        setError('Failed to load ranking data');
+        dispatch(setError('Failed to load ranking data'));
       } finally {
-        setLoading(false);
+        dispatch(setLoading(false));
       }
     };
 
     fetchRankingData();
-  }, [timeRange, selectedModel]);
+  }, [timeRange, selectedModel, promptId, dispatch, storePromptId]);
+
+  if (loading && currentRankingData.length === 0) {
+    return <LoadingScreen text="Loading ranking data..." />;
+  }
 
   return (
     <div className="space-y-4 pb-8">
@@ -87,7 +117,9 @@ const RankingPage = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <BarChart3 className="w-5 h-5 text-muted-foreground" />
-          <h1 className="text-lg font-semibold">Ranking</h1>
+          <h1 className="text-lg font-semibold">
+            {promptId ? "Prompt Competitors" : "Ranking"}
+          </h1>
         </div>
         <div className="flex items-center gap-3">
           <Select value={timeRange} onValueChange={setTimeRange}>
@@ -127,7 +159,7 @@ const RankingPage = () => {
             <div className="flex items-center justify-center py-12">
               <div className="text-sm text-red-600">Error: {error}</div>
             </div>
-          ) : rankingData.length === 0 ? (
+          ) : currentRankingData.length === 0 ? (
             <div className="flex items-center justify-center py-12 px-6">
               <div className="text-center">
                 <BarChart3 className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
@@ -135,50 +167,51 @@ const RankingPage = () => {
                   No ranking data available
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Add competitors to see ranking data
+                  {promptId ? "No brands found for this prompt" : "Add competitors to see ranking data"}
                 </p>
               </div>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent border-b">
-                  <TableHead className="text-xs font-medium text-muted-foreground w-10 pl-6">
-                    #
-                  </TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">
-                    Brand
-                  </TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground text-right">
-                    Visibility{" "}
-                    <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-muted text-muted-foreground ml-1 text-[10px]">
-                      ?
-                    </span>
-                  </TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground text-right">
-                    Sentiment{" "}
-                    <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-muted text-muted-foreground ml-1 text-[10px]">
-                      ?
-                    </span>
-                  </TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground text-right pr-6">
-                    Position{" "}
-                    <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-muted text-muted-foreground ml-1 text-[10px]">
-                      ?
-                    </span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rankingData.map((item, index) => (
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent border-b bg-muted/30">
+                    <TableHead className="text-xs font-medium text-muted-foreground w-10 pl-6 border-r">
+                      #
+                    </TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground border-r">
+                      Brand
+                    </TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground text-right border-r">
+                      Visibility{" "}
+                      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-muted text-muted-foreground ml-1 text-[10px]">
+                        ?
+                      </span>
+                    </TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground text-right border-r">
+                      Sentiment{" "}
+                      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-muted text-muted-foreground ml-1 text-[10px]">
+                        ?
+                      </span>
+                    </TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground text-right pr-6">
+                      Position{" "}
+                      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-muted text-muted-foreground ml-1 text-[10px]">
+                        ?
+                      </span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {currentRankingData.map((item, index) => (
                   <TableRow
                     key={item.id}
                     className="hover:bg-muted/50 border-b last:border-0"
                   >
-                    <TableCell className="text-xs text-muted-foreground pl-6 py-3">
+                    <TableCell className="text-xs text-muted-foreground pl-6 py-3 border-r">
                       {index + 1}
                     </TableCell>
-                    <TableCell className="py-3">
+                    <TableCell className="py-3 border-r">
                       <div className="flex items-center gap-2.5">
                         <Avatar className="w-6 h-6">
                           <AvatarImage src={item.logo} alt={item.brand} />
@@ -189,10 +222,10 @@ const RankingPage = () => {
                         <span className="text-sm font-medium">{item.brand}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right text-sm font-semibold py-3">
+                    <TableCell className="text-right text-sm font-semibold py-3 border-r">
                       {item.visibility}
                     </TableCell>
-                    <TableCell className="text-right py-3">
+                    <TableCell className="text-right py-3 border-r">
                       {typeof item.sentiment === "number" ? (
                         <div className="flex items-center justify-end gap-1">
                           <div className="w-0.5 h-3.5 bg-green-500 rounded"></div>
@@ -204,13 +237,14 @@ const RankingPage = () => {
                         <span className="text-sm text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground pr-6 py-3">
-                      {item.position}
+                    <TableCell className="text-right text-sm font-medium pr-6 py-3">
+                    {item.position}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

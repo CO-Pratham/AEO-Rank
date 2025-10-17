@@ -4,6 +4,7 @@ import onboardingSlice from './slices/onboardingSlice';
 import userSlice from './slices/userSlice';
 import promptsSlice from './slices/promptsSlice';
 import competitorsSlice from './slices/competitorsSlice';
+import rankingSlice from './slices/rankingSlice';
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
     user: userSlice,
     prompts: promptsSlice,
     competitors: competitorsSlice,
+    ranking: rankingSlice,
   },
 });
 
