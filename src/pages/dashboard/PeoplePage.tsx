@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/select";
 import { Users, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { sendInviteEmail } from "@/services/emailService";
 
 interface User {
   id: string;
@@ -30,9 +29,9 @@ const PeoplePage = () => {
   const [inviteTo, setInviteTo] = useState<
     "Company Member" | "Workspace Member"
   >("Company Member");
-  const [inviteAs, setInviteAs] = useState<
-    "Admin" | "Editor" | "Viewer"
-  >("Admin");
+  const [inviteAs, setInviteAs] = useState<"Admin" | "Editor" | "Viewer">(
+    "Admin"
+  );
   const [isSendingInvite, setIsSendingInvite] = useState(false);
 
   const getTimeAgo = (date: Date) => {
@@ -78,42 +77,66 @@ const PeoplePage = () => {
     setIsSendingInvite(true);
 
     try {
-      // Send the invitation email
-      const emailSent = await sendInviteEmail({
-        recipientEmail: inviteEmail,
-        recipientRole: `${inviteTo} - ${inviteAs}`,
-        inviterName: currentUser.name || currentUser.email || "AEORank Team",
-        inviterEmail: currentUser.email || "team@aeorank.com",
-      });
+      // Get the access token
+      const token = localStorage.getItem("accessToken");
 
-      if (emailSent) {
-        const newUser: User = {
-          id: Date.now().toString(),
-          email: inviteEmail,
-          inviteTo: inviteTo,
-          inviteAs: inviteAs,
-          createdAt: new Date(),
-        };
-
-        setUsers([...users, newUser]);
-        setInviteEmail("");
-        setInviteTo("Company Member");
-        setInviteAs("Admin");
-
-        toast({
-          title: "Invitation Sent! 📧",
-          description: `An invitation email has been sent to ${inviteEmail}`,
-          duration: 5000,
-        });
-      } else {
-        throw new Error("Failed to send email");
+      if (!token) {
+        throw new Error("No access token found");
       }
-    } catch (error) {
+
+      // Get baseurl from current window
+      const baseurl = window.location.origin;
+
+      // Send email and baseurl to the backend to send invitation email
+      const response = await fetch(
+        "https://aeotest-production.up.railway.app/user/add/member",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: inviteEmail,
+            baseurl: baseurl,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to invite user");
+      }
+
+      // Note: We don't call the verification endpoint here
+      // The verification endpoint will be called when the user clicks the link in their email
+
+      // Add user to the local state with role and type for display only
+      const newUser: User = {
+        id: Date.now().toString(),
+        email: inviteEmail,
+        inviteTo: inviteTo,
+        inviteAs: inviteAs,
+        createdAt: new Date(),
+      };
+
+      setUsers([...users, newUser]);
+      setInviteEmail("");
+      setInviteTo("Company Member");
+      setInviteAs("Admin");
+
+      toast({
+        title: "Invitation Sent! 📧",
+        description: `An invitation email has been sent to ${inviteEmail}. They will be added once they verify their email.`,
+        duration: 5000,
+      });
+    } catch (error: any) {
       console.error("Error sending invitation:", error);
       toast({
         title: "Failed to Send Invitation",
         description:
-          "There was an error sending the invitation email. Please try again.",
+          error.message ||
+          "There was an error sending the invitation. Please try again.",
         variant: "destructive",
         duration: 5000,
       });

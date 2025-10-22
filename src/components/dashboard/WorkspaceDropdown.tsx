@@ -82,18 +82,22 @@ const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
                 src={
                   (() => {
                     const brandName = brand?.name || brand?.brand_name;
+                    const brandDomain = brand?.domain || brand?.website;
                     if ((brand as any)?.logo) return (brand as any).logo;
                     
-                    // Brand domain mapping for correct logos
-                    const brandDomainMapping: Record<string, string> = {
-                      'bajaj': 'bajajfinserv.in',
-                      'Bajaj': 'bajajfinserv.in',
-                      'BAJAJ': 'bajajfinserv.in',
-                      'bajaj finserv': 'bajajfinserv.in',
-                      'Bajaj Finserv': 'bajajfinserv.in',
-                    };
-                    
-                    if (brandName) {
+                    if (brandDomain) {
+                      // Use the actual domain from brand data
+                      return `https://www.google.com/s2/favicons?domain=${brandDomain}&sz=64`;
+                    } else if (brandName) {
+                      // Brand domain mapping for correct logos
+                      const brandDomainMapping: Record<string, string> = {
+                        'bajaj': 'bajajfinserv.in',
+                        'Bajaj': 'bajajfinserv.in',
+                        'BAJAJ': 'bajajfinserv.in',
+                        'bajaj finserv': 'bajajfinserv.in',
+                        'Bajaj Finserv': 'bajajfinserv.in',
+                      };
+                      
                       const mappedDomain = brandDomainMapping[brandName.toLowerCase()] || brandDomainMapping[brandName];
                       if (mappedDomain) {
                         return `https://www.google.com/s2/favicons?domain=${mappedDomain}&sz=64`;
@@ -136,11 +140,15 @@ const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
                 src={
                   (() => {
                     const brandName = brand?.name || brand?.brand_name;
+                    const brandDomain = brand?.domain || brand?.website;
                     if ((brand as any)?.logo) return (brand as any).logo;
                     
-                    if (brandName) {
-                      const domain = brand?.website || brand?.domain || `${brandName.toLowerCase().replace(/\s+/g, '')}.com`;
-                      return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+                    if (brandDomain) {
+                      // Use the actual domain from brand data
+                      return `https://www.google.com/s2/favicons?domain=${brandDomain}&sz=64`;
+                    } else if (brandName) {
+                      // Fallback to brand name
+                      return `https://www.google.com/s2/favicons?domain=${brandName.toLowerCase().replace(/\s+/g, '')}.com&sz=64`;
                     }
                     return user.avatar;
                   })()
@@ -156,16 +164,16 @@ const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
                 {brand?.name || brand?.brand_name || "Your Workspace"}
               </h3>
               <div className="space-y-1">
-                {brand?.website && (
+                {(brand?.website || brand?.domain) && (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Globe className="w-3 h-3 flex-shrink-0" />
-                    <span className="truncate">{brand.website}</span>
+                    <span className="truncate">{brand.website || brand.domain}</span>
                   </div>
                 )}
-                {brand?.location && (
+                {(brand?.location || brand?.country) && (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <MapPin className="w-3 h-3 flex-shrink-0" />
-                    <span className="truncate">{brand.location}</span>
+                    <span className="truncate">{brand.location || brand.country}</span>
                   </div>
                 )}
               </div>

@@ -1,19 +1,23 @@
 import { configureStore } from '@reduxjs/toolkit';
-import authSlice from './slices/authSlice';
-import onboardingSlice from './slices/onboardingSlice';
-import userSlice from './slices/userSlice';
-import promptsSlice from './slices/promptsSlice';
-import competitorsSlice from './slices/competitorsSlice';
-import rankingSlice from './slices/rankingSlice';
+import authReducer from './slices/authSlice';
+import onboardingReducer from './slices/onboardingSlice';
+import userReducer from './slices/userSlice';
+import promptsReducer from './slices/promptsSlice';
+import competitorsReducer from './slices/competitorsSlice';
+import rankingReducer from './slices/rankingSlice';
+import tagsReducer from './slices/tagsSlice';
+import billingReducer from './slices/billingSlice';
 
 export const store = configureStore({
   reducer: {
-    auth: authSlice,
-    onboarding: onboardingSlice,
-    user: userSlice,
-    prompts: promptsSlice,
-    competitors: competitorsSlice,
-    ranking: rankingSlice,
+    auth: authReducer,
+    onboarding: onboardingReducer,
+    user: userReducer,
+    prompts: promptsReducer,
+    competitors: competitorsReducer,
+    ranking: rankingReducer,
+    tags: tagsReducer,
+    billing: billingReducer,
   },
 });
 

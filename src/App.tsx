@@ -35,8 +35,10 @@ import PeoplePage from "./pages/dashboard/PeoplePage";
 import WorkspacePage from "./pages/dashboard/WorkspacePage";
 import CompanyPage from "./pages/dashboard/CompanyPage";
 import SubscriptionPage from "./pages/dashboard/SubscriptionPage";
+import BillingPage from "./pages/dashboard/BillingPage";
 import NotFound from "./pages/NotFound";
 import VerifyEmail from "./pages/VerifyEmail";
+import VerifyMember from "./pages/VerifyMember";
 import OAuthCallback from "./pages/OAuthCallback";
 
 const queryClient = new QueryClient();
@@ -48,55 +50,82 @@ const App = () => (
         <CompetitorsProvider>
           <SourcesProvider>
             <BrandProvider>
-            <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/oauth-callback" element={<OAuthCallback />} />
-          <Route path="/oauth/callback" element={<OAuthCallback />} />
-          <Route path="/verify" element={<VerifyEmail />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/demo" element={<Demo />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/agency" element={<Agency />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/blog/chatgpt-optimization-2024" element={<ChatGPTOptimization />} />
-          <Route path="/blog/complete-aeo-guide" element={<AEOGuide />} />
-          <Route path="/blog/claude-vs-chatgpt-comparison" element={<ClaudeVsChatGPT />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/best-practices" element={<BestPractices />} />
-          <Route path="/dashboard" element={<DashboardLayout />}>
-            <Route index element={<DashboardOverview />} />
-            <Route path="ranking" element={<RankingPage />} />
-            <Route path="prompts" element={<PromptsPage />} />
-            <Route path="prompts/:id" element={<PromptDetailPage />} />
-            <Route path="sources" element={<SourcesPage />} />
-            <Route path="best-practices" element={<BestPractices />} />
-            <Route path="recommendations" element={<Recommendations />} />
-            <Route path="competitors" element={<CompetitorsPage />} />
-            <Route path="tags" element={<TagsPage />} />
-            <Route path="people" element={<PeoplePage />} />
-            <Route path="workspace" element={<WorkspacePage />} />
-            <Route path="company" element={<CompanyPage />} />
-            <Route path="subscription" element={<SubscriptionPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-          </Route>
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-
-        </Routes>
-      </BrowserRouter>
-            </TooltipProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/signup" element={<Signup />} />
+                    <Route path="/oauth-callback" element={<OAuthCallback />} />
+                    <Route path="/oauth/callback" element={<OAuthCallback />} />
+                    <Route path="/verify" element={<VerifyEmail />} />
+                    <Route path="/verify-email" element={<VerifyEmail />} />
+                    <Route path="/verify-member" element={<VerifyMember />} />
+                    {/* Handle direct backend verification URLs by redirecting to our frontend route */}
+                    <Route
+                      path="/user/verify/member"
+                      element={<VerifyMember />}
+                    />
+                    <Route path="/onboarding" element={<Onboarding />} />
+                    <Route path="/demo" element={<Demo />} />
+                    <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/agency" element={<Agency />} />
+                    <Route path="/blog" element={<Blog />} />
+                    <Route
+                      path="/blog/chatgpt-optimization-2024"
+                      element={<ChatGPTOptimization />}
+                    />
+                    <Route
+                      path="/blog/complete-aeo-guide"
+                      element={<AEOGuide />}
+                    />
+                    <Route
+                      path="/blog/claude-vs-chatgpt-comparison"
+                      element={<ClaudeVsChatGPT />}
+                    />
+                    <Route path="/contact" element={<Contact />} />
+                    <Route path="/best-practices" element={<BestPractices />} />
+                    <Route path="/dashboard" element={<DashboardLayout />}>
+                      <Route index element={<DashboardOverview />} />
+                      <Route path="ranking" element={<RankingPage />} />
+                      <Route path="prompts" element={<PromptsPage />} />
+                      <Route
+                        path="prompts/:id"
+                        element={<PromptDetailPage />}
+                      />
+                      <Route path="sources" element={<SourcesPage />} />
+                      <Route
+                        path="best-practices"
+                        element={<BestPractices />}
+                      />
+                      <Route
+                        path="recommendations"
+                        element={<Recommendations />}
+                      />
+                      <Route path="competitors" element={<CompetitorsPage />} />
+                      <Route path="tags" element={<TagsPage />} />
+                      <Route path="people" element={<PeoplePage />} />
+                      <Route path="workspace" element={<WorkspacePage />} />
+                      <Route path="company" element={<CompanyPage />} />
+                      <Route path="billing" element={<BillingPage />} />
+                      <Route
+                        path="subscription"
+                        element={<SubscriptionPage />}
+                      />
+                      <Route path="settings" element={<SettingsPage />} />
+                    </Route>
+                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </BrowserRouter>
+              </TooltipProvider>
             </BrandProvider>
           </SourcesProvider>
         </CompetitorsProvider>
       </TagsProvider>
-      </WorkspaceProvider>
+    </WorkspaceProvider>
   </QueryClientProvider>
 );
 

@@ -45,7 +45,8 @@ import {
 } from "lucide-react";
 import { LoadingScreen } from "@/components/ui/loading-spinner";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useTags } from "@/context/TagsContext";
+import { useAppDispatch, useAppSelector } from "@/hooks/redux";
+import { incrementTagMentions } from "@/store/slices/tagsSlice";
 
 interface Prompt {
   id: number;
@@ -63,7 +64,8 @@ interface Prompt {
 }
 
 const PromptsPage = () => {
-  const { incrementTagMentions } = useTags();
+  const dispatch = useAppDispatch();
+  const availableTags = useAppSelector((state) => state.tags.tags);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [timeRange, setTimeRange] = useState("7d");
@@ -73,7 +75,6 @@ const PromptsPage = () => {
   const [addPromptTab, setAddPromptTab] = useState("single");
   const [selectedCountry, setSelectedCountry] = useState("IN");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState("");
   const [selectedPromptIds, setSelectedPromptIds] = useState<number[]>([]);
   const [selectedInactiveIds, setSelectedInactiveIds] = useState<number[]>([]);
   const [activePrompts, setActivePrompts] = useState<Prompt[]>([]);
@@ -88,163 +89,290 @@ const PromptsPage = () => {
   const fetchActivePrompts = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('accessToken');
-  
-      const response = await fetch('https://aeotest-production.up.railway.app/prompt/meta/get', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        mode: 'cors'
-      });
-  
+      const token = localStorage.getItem("accessToken");
+
+      const response = await fetch(
+        "https://aeotest-production.up.railway.app/prompt/meta/get",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          mode: "cors",
+        }
+      );
+
       if (!response.ok) {
         throw new Error(`Failed to fetch prompts: ${response.status}`);
       }
-  
+
       const data = await response.json();
-      console.log('Active Prompts API Response:', data);
-      
+      console.log("Active Prompts API Response:", data);
+
       // Process the data to match the expected format
-      const processedPrompts = Array.isArray(data) ? data.map((item) => {
-        // Convert mentions object to array format for UI
-        const mentionsArray = item.mentions && typeof item.mentions === 'object' ? 
-          Object.entries(item.mentions)
-            .map(([platform, count]) => {
-              const platformColors: Record<string, string> = {
-                'ChatGPT': '#10a37f',
-                'Claude': '#cc785c',
-                'Gemini': '#4285f4',
-                'Perplexity': '#1fb6ff',
-                'Freshworks': '#ff6b6b',
-                'Salesforce': '#00a1e0',
-                'Zoho': '#e42527',
-              };
-              
-              return {
-                platform,
-                color: platformColors[platform] || '#6b7280',
-                count: Number(count) || 0
-              };
-            })
-            .filter(m => m.count > 0) // Only show platforms with mentions > 0
-          : [];
-  
-        // Process tags - handle null, array, or string
-        const tagsArray = item.tags ? 
-          (Array.isArray(item.tags) ? item.tags : 
-           typeof item.tags === 'string' ? item.tags.split(',').map(t => t.trim()).filter(Boolean) : 
-           []) : [];
-  
-        // Store actual volume value for display
-        const volumeValue = Number(item.volume) || 0;
-        const volumeBars = Math.min(Math.max(Math.ceil(volumeValue / 100), 0), 5);
-  
-        return {
-          id: item.id,
-          prompt: item.prompt || 'No prompt text',
-          // Backend should provide these fields - using defaults for now
-          visibility: item.visibility !== undefined ? `${item.visibility}%` : '—',
-          sentiment: item.sentiment || '—',
-          position: item.position ? `#${item.position}` : '—',
-          mentions: mentionsArray,
-          volume: volumeBars,
-          volumeValue: volumeValue,
-          tags: tagsArray,
-          addedAt: item.added ? new Date(item.added) : new Date(),
-          location: item.location || '—'
-        };
-      }) : [];
-      
-      console.log('Processed prompts:', processedPrompts);
-      console.log('Sample processed prompt:', processedPrompts[0]); // Debug first item
+      const processedPrompts = Array.isArray(data)
+        ? data.map((item) => {
+            // Convert mentions object to array format for UI
+            const mentionsArray =
+              item.mentions && typeof item.mentions === "object"
+                ? Object.entries(item.mentions)
+                    .map(([platform, count]) => {
+                      const platformColors: Record<string, string> = {
+                        ChatGPT: "#10a37f",
+                        Claude: "#cc785c",
+                        Gemini: "#4285f4",
+                        Perplexity: "#1fb6ff",
+                        Freshworks: "#ff6b6b",
+                        Salesforce: "#00a1e0",
+                        Zoho: "#e42527",
+                      };
+
+                      return {
+                        platform,
+                        color: platformColors[platform] || "#6b7280",
+                        count: Number(count) || 0,
+                      };
+                    })
+                    .filter((m) => m.count > 0) // Only show platforms with mentions > 0
+                : [];
+
+            // Process tags - handle null, array, or string
+            const tagsArray = item.tags
+              ? Array.isArray(item.tags)
+                ? item.tags
+                : typeof item.tags === "string"
+                ? item.tags
+                    .split(",")
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+                : []
+              : [];
+
+            // Store actual volume value for display
+            const volumeValue = Number(item.volume) || 0;
+            const volumeBars = Math.min(
+              Math.max(Math.ceil(volumeValue / 100), 0),
+              5
+            );
+
+            return {
+              id: item.id,
+              prompt: item.prompt || "No prompt text",
+              // Backend should provide these fields - using defaults for now
+              visibility:
+                item.visibility !== undefined ? `${item.visibility}%` : "—",
+              sentiment: item.sentiment || "—",
+              position: item.position ? `#${item.position}` : "—",
+              mentions: mentionsArray,
+              volume: volumeBars,
+              volumeValue: volumeValue,
+              tags: tagsArray,
+              addedAt: item.added ? new Date(item.added) : new Date(),
+              location: item.location || "—",
+            };
+          })
+        : [];
+
+      console.log("Processed prompts:", processedPrompts);
+      console.log("Sample processed prompt:", processedPrompts[0]); // Debug first item
       setActivePrompts(processedPrompts);
     } catch (error) {
-      console.error('Error fetching active prompts:', error);
+      console.error("Error fetching active prompts:", error);
       setActivePrompts([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const createPrompt = async (promptData: Omit<Prompt, 'id'>) => {
+  const createPrompt = async (promptData: Omit<Prompt, "id">) => {
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = localStorage.getItem("accessToken");
 
       // Optimistically add to UI while we await the backend
       const optimistic: Prompt = {
         ...promptData,
         id: Date.now(),
       };
-      setActivePrompts(prev => [optimistic, ...prev]);
+      setActivePrompts((prev) => [optimistic, ...prev]);
 
       // Map country code to full name if needed
       const countryCodeToName: Record<string, string> = {
-        IN: 'India',
-        US: 'United States',
-        GB: 'United Kingdom',
-        CA: 'Canada',
-        AU: 'Australia',
-        DE: 'Germany',
+        IN: "India",
+        US: "United States",
+        GB: "United Kingdom",
+        CA: "Canada",
+        AU: "Australia",
+        DE: "Germany",
       };
-      const fullCountry = countryCodeToName[(promptData.location as string) || ''] || (promptData.location as string) || '';
+      const fullCountry =
+        countryCodeToName[(promptData.location as string) || ""] ||
+        (promptData.location as string) ||
+        "";
 
-      const response = await fetch('https://aeotest-production.up.railway.app/prompt/add', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        mode: 'cors',
-        body: JSON.stringify({
-          prompt: promptData.prompt,
-          tags: promptData.tags,
-          // Backend expects `country` with full name (e.g., "India")
-          country: fullCountry,
-          // keep location for forward-compat if backend also accepts it
-          location: fullCountry,
-          // include any other fields your backend expects
-        }),
-      });
+      // Use the correct endpoint for adding prompts
+      const response = await fetch(
+        "https://aeotest-production.up.railway.app/prompt/add",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          mode: "cors",
+          body: JSON.stringify({
+            prompt: promptData.prompt,
+            tags: promptData.tags,
+            country: fullCountry,
+            location: fullCountry,
+          }),
+        }
+      );
 
       if (!response.ok) {
-        console.warn('Backend add prompt failed, keeping optimistic item. Status:', response.status);
+        console.warn(
+          "Backend add prompt failed, keeping optimistic item. Status:",
+          response.status
+        );
+        // Keep the optimistic item in the UI
         return optimistic;
       }
 
       const data = await response.json();
+      console.log("Prompt creation response:", data);
+
       // Map backend response to our Prompt shape safely
       const created: Prompt = {
         id: data.id ?? optimistic.id,
         prompt: data.prompt ?? promptData.prompt,
-        visibility: data.visibility !== undefined ? `${data.visibility}%` : promptData.visibility,
+        visibility:
+          data.visibility !== undefined
+            ? `${data.visibility}%`
+            : promptData.visibility,
         sentiment: data.sentiment ?? promptData.sentiment,
         position: data.position ? `#${data.position}` : promptData.position,
-        mentions: Array.isArray(promptData.mentions) ? promptData.mentions : [],
-        volume: promptData.volume,
-        volumeValue: typeof data.volume === 'number' ? data.volume : (promptData as any).volumeValue ?? 0,
+        mentions: Array.isArray(data.mentions) ? data.mentions : [],
+        volume: data.volume !== undefined ? data.volume : promptData.volume,
+        volumeValue:
+          typeof data.volume === "number"
+            ? data.volume
+            : (promptData as any).volumeValue ?? 0,
         tags: Array.isArray(data.tags) ? data.tags : promptData.tags,
-        addedAt: data.added ? new Date(data.added) : (promptData.addedAt ?? new Date()),
+        addedAt: data.addedAt
+          ? new Date(data.addedAt)
+          : promptData.addedAt ?? new Date(),
         location: data.country ?? data.location ?? fullCountry,
       };
 
       // Replace optimistic with backend-confirmed version
-      setActivePrompts(prev => {
-        const withoutOptimistic = prev.filter(p => p.id !== optimistic.id);
+      setActivePrompts((prev) => {
+        const withoutOptimistic = prev.filter((p) => p.id !== optimistic.id);
         return [created, ...withoutOptimistic];
       });
 
       return created;
     } catch (error) {
-      console.error('Error creating prompt:', error);
+      console.error("Error creating prompt:", error);
+      // In case of error, keep the optimistic item
       throw error;
     }
   };
 
-  // Load prompts on component mount
+  // Fetch inactive prompts
+  const fetchInactivePrompts = async () => {
+    try {
+      const token = localStorage.getItem("accessToken");
+
+      const response = await fetch(
+        "https://aeotest-production.up.railway.app/prompt/inactive",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch inactive prompts: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Inactive Prompts API Response:", data);
+
+      // Process the data similar to active prompts
+      const processedPrompts = Array.isArray(data)
+        ? data.map((item) => {
+            const mentionsArray =
+              item.mentions && typeof item.mentions === "object"
+                ? Object.entries(item.mentions)
+                    .filter(([_, value]) => value === true)
+                    .map(([platform]) => ({
+                      platform:
+                        platform.charAt(0).toUpperCase() + platform.slice(1),
+                      color: getPlatformColor(platform),
+                    }))
+                : [];
+
+            const tagsArray = item.tags
+              ? Array.isArray(item.tags)
+                ? item.tags
+                : typeof item.tags === "string"
+                ? item.tags
+                    .split(",")
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+                : []
+              : [];
+
+            const volumeValue = Number(item.volume) || 0;
+            const volumeBars = Math.min(
+              Math.max(Math.ceil(volumeValue / 100), 0),
+              5
+            );
+
+            return {
+              id: item.id,
+              prompt: item.prompt || "No prompt text",
+              visibility:
+                item.visibility !== undefined ? `${item.visibility}%` : "—",
+              sentiment: item.sentiment || "—",
+              position: item.position ? `#${item.position}` : "—",
+              mentions: mentionsArray,
+              volume: volumeBars,
+              volumeValue: volumeValue,
+              tags: tagsArray,
+              addedAt: item.added ? new Date(item.added) : new Date(),
+              location: item.location || "—",
+            };
+          })
+        : [];
+
+      console.log("Processed inactive prompts:", processedPrompts);
+      setInactivePrompts(processedPrompts);
+    } catch (error) {
+      console.error("Error fetching inactive prompts:", error);
+      setInactivePrompts([]);
+    }
+  };
+
+  // Helper function to get platform color
+  const getPlatformColor = (platform: string) => {
+    const colorMap: Record<string, string> = {
+      chatgpt: "#10a37f",
+      claude: "#d97757",
+      gemini: "#4285f4",
+      perplexity: "#7c3aed",
+      copilot: "#0078d4",
+    };
+    return colorMap[platform.toLowerCase()] || "#6b7280";
+  };
+
+  // Load prompts on component mount and when prompts change
   useEffect(() => {
     fetchActivePrompts();
+    fetchInactivePrompts();
   }, []);
 
   const renderVolumeIndicator = (volume: number) => {
@@ -280,9 +408,7 @@ const PromptsPage = () => {
     const csvContent =
       "data:text/csv;charset=utf-8," +
       "Prompt,Volume\n" +
-      activePrompts
-        .map((p) => `"${p.prompt}",${p.volume}`)
-        .join("\n");
+      activePrompts.map((p) => `"${p.prompt}",${p.volume}`).join("\n");
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -303,6 +429,9 @@ const PromptsPage = () => {
     }
 
     try {
+      // Generate unique ID for the prompt
+      const promptId = Date.now();
+
       // Create new prompt object
       const newPromptData = {
         prompt: newPromptText,
@@ -323,28 +452,25 @@ const PromptsPage = () => {
 
       // Increment mentions for each tag used in this prompt
       if (selectedTags.length > 0) {
-        incrementTagMentions(selectedTags);
+        dispatch(
+          incrementTagMentions({ tagNames: selectedTags, promptId: promptId })
+        );
       }
 
       // Reset form
       setNewPromptText("");
       setSelectedTags([]);
-      setTagInput("");
       setSelectedCountry("IN");
       setAddDialogOpen(false);
+
+      // Refresh the prompts list
+      await fetchActivePrompts();
 
       // Show success message
       alert("Prompt added successfully!");
     } catch (error) {
       console.error("Error adding prompt:", error);
       alert("Failed to add prompt. Please try again.");
-    }
-  };
-
-  const handleAddTag = () => {
-    if (tagInput.trim() && !selectedTags.includes(tagInput.trim())) {
-      setSelectedTags([...selectedTags, tagInput.trim()]);
-      setTagInput("");
     }
   };
 
@@ -384,20 +510,46 @@ const PromptsPage = () => {
     alert(`Assign tags to ${selectedPromptIds.length} selected prompt(s)`);
   };
 
-  const handleDeactivate = () => {
+  const handleDeactivate = async () => {
     if (
-      confirm(
+      !confirm(
         `Are you sure you want to deactivate ${selectedPromptIds.length} prompt(s)?`
       )
     ) {
-      const promptsToDeactivate = activePrompts.filter((p) =>
-        selectedPromptIds.includes(p.id)
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("accessToken");
+
+   
+      const response = await fetch(
+        "https://aeotest-production.up.railway.app/prompt/state",
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt_ids: selectedPromptIds,
+            is_active: false,
+          }),
+        }
       );
-      setInactivePrompts([...inactivePrompts, ...promptsToDeactivate]);
-      setActivePrompts(
-        activePrompts.filter((p) => !selectedPromptIds.includes(p.id))
-      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to deactivate prompts: ${response.status}`);
+      }
+
+      console.log("Prompts deactivated successfully");
+
+      // Refresh both active and inactive prompts from server
+      await Promise.all([fetchActivePrompts(), fetchInactivePrompts()]);
       setSelectedPromptIds([]);
+    } catch (error) {
+      console.error("Error deactivating prompts:", error);
+      alert("Failed to deactivate prompts. Please try again.");
     }
   };
 
@@ -423,20 +575,46 @@ const PromptsPage = () => {
     alert(`Assign tags to ${selectedInactiveIds.length} selected prompt(s)`);
   };
 
-  const handleActivate = () => {
+  const handleActivate = async () => {
     if (
-      confirm(
+      !confirm(
         `Are you sure you want to activate ${selectedInactiveIds.length} prompt(s)?`
       )
     ) {
-      const promptsToActivate = inactivePrompts.filter((p) =>
-        selectedInactiveIds.includes(p.id)
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("accessToken");
+
+      // Call API to change prompt state to active
+      const response = await fetch(
+        "https://aeotest-production.up.railway.app/prompt/state",
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt_ids: selectedInactiveIds,
+            is_active: true,
+          }),
+        }
       );
-      setActivePrompts([...activePrompts, ...promptsToActivate]);
-      setInactivePrompts(
-        inactivePrompts.filter((p) => !selectedInactiveIds.includes(p.id))
-      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to activate prompts: ${response.status}`);
+      }
+
+      console.log("Prompts activated successfully");
+
+      // Refresh both active and inactive prompts from server
+      await Promise.all([fetchActivePrompts(), fetchInactivePrompts()]);
       setSelectedInactiveIds([]);
+    } catch (error) {
+      console.error("Error activating prompts:", error);
+      alert("Failed to activate prompts. Please try again.");
     }
   };
 
@@ -454,8 +632,8 @@ const PromptsPage = () => {
   };
 
   const handleFileUpload = (file: File) => {
-    if (!file.name.endsWith('.csv')) {
-      alert('Please upload a CSV file');
+    if (!file.name.endsWith(".csv")) {
+      alert("Please upload a CSV file");
       return;
     }
     setUploadedFile(file);
@@ -489,39 +667,49 @@ const PromptsPage = () => {
 
   const processBulkUpload = async () => {
     if (!uploadedFile) {
-      alert('Please select a file first');
+      alert("Please select a file first");
       return;
     }
 
     try {
       const text = await uploadedFile.text();
-      console.log('File content:', text);
-      
-      const lines = text.split('\n').map(line => line.trim()).filter(line => line);
-      
+      console.log("File content:", text);
+
+      const lines = text
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line);
+
       if (lines.length === 0) {
-        alert('The CSV file is empty.');
+        alert("The CSV file is empty.");
         return;
       }
 
       const prompts = [];
-      
+
       for (const line of lines) {
         // Simple comma split - handle both quoted and unquoted
-        const parts = line.split(',');
-        
+        const parts = line.split(",");
+
         if (parts.length >= 1) {
-          const promptText = parts[0].replace(/^"|"$/g, '').trim();
-          
-          if (promptText && promptText.toLowerCase() !== 'prompt') {
-            const tagsText = parts[1] ? parts[1].replace(/^"|"$/g, '').trim() : '';
-            const tags = tagsText ? tagsText.split(';').map(t => t.trim()).filter(Boolean) : [];
-            
+          const promptText = parts[0].replace(/^"|"$/g, "").trim();
+
+          if (promptText && promptText.toLowerCase() !== "prompt") {
+            const tagsText = parts[1]
+              ? parts[1].replace(/^"|"$/g, "").trim()
+              : "";
+            const tags = tagsText
+              ? tagsText
+                  .split(";")
+                  .map((t) => t.trim())
+                  .filter(Boolean)
+              : [];
+
             prompts.push({
               prompt: promptText,
-              visibility: '0%',
-              sentiment: '—',
-              position: '—',
+              visibility: "0%",
+              sentiment: "—",
+              position: "—",
               mentions: [],
               volume: 0,
               tags,
@@ -531,10 +719,12 @@ const PromptsPage = () => {
         }
       }
 
-      console.log('Parsed prompts:', prompts);
+      console.log("Parsed prompts:", prompts);
 
       if (prompts.length === 0) {
-        alert('No valid prompts found. Make sure your CSV has prompts in the first column.');
+        alert(
+          "No valid prompts found. Make sure your CSV has prompts in the first column."
+        );
         return;
       }
 
@@ -549,7 +739,7 @@ const PromptsPage = () => {
       setUploadedFile(null);
       setAddDialogOpen(false);
     } catch (error) {
-      console.error('CSV processing error:', error);
+      console.error("CSV processing error:", error);
       alert(`Error: ${error.message}`);
     }
   };
@@ -668,7 +858,7 @@ const PromptsPage = () => {
                               <TableHead className="font-medium text-xs min-w-[300px] sticky left-[40px] bg-background z-10">
                                 Prompt
                               </TableHead>
-                              
+
                               <TableHead className="font-medium text-xs text-center min-w-[120px]">
                                 Mentions
                               </TableHead>
@@ -704,18 +894,24 @@ const PromptsPage = () => {
                                   <TableCell className="py-3">
                                     <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
                                   </TableCell>
-                                  
+
                                   <TableCell className="py-3">
                                     <div className="flex items-center justify-center gap-1">
                                       {Array.from({ length: 3 }).map((_, i) => (
-                                        <div key={i} className="w-5 h-5 bg-gray-200 rounded-md animate-pulse"></div>
+                                        <div
+                                          key={i}
+                                          className="w-5 h-5 bg-gray-200 rounded-md animate-pulse"
+                                        ></div>
                                       ))}
                                     </div>
                                   </TableCell>
                                   <TableCell className="py-3">
                                     <div className="flex items-center justify-center gap-0.5">
                                       {Array.from({ length: 5 }).map((_, i) => (
-                                        <div key={i} className="w-1 h-3 bg-gray-200 rounded-sm animate-pulse"></div>
+                                        <div
+                                          key={i}
+                                          className="w-1 h-3 bg-gray-200 rounded-sm animate-pulse"
+                                        ></div>
                                       ))}
                                     </div>
                                   </TableCell>
@@ -761,15 +957,20 @@ const PromptsPage = () => {
                                   <TableCell className="py-3 sticky left-[40px] bg-background">
                                     <button
                                       onClick={() => {
-                                        console.log("Navigating to prompt:", prompt.id);
-                                        navigate(`/dashboard/prompts/${prompt.id}`);
+                                        console.log(
+                                          "Navigating to prompt:",
+                                          prompt.id
+                                        );
+                                        navigate(
+                                          `/dashboard/prompts/${prompt.id}`
+                                        );
                                       }}
                                       className="text-sm text-left hover:text-blue-600 hover:underline transition-colors cursor-pointer"
                                     >
                                       {prompt.prompt}
                                     </button>
                                   </TableCell>
-                                  
+
                                   <TableCell className="py-3">
                                     <div className="flex items-center justify-center gap-1">
                                       {prompt.mentions.map((mention, idx) => (
@@ -791,7 +992,9 @@ const PromptsPage = () => {
                                   </TableCell>
                                   <TableCell className="text-center py-3">
                                     <span className="text-sm font-medium">
-                                      {prompt.volumeValue ? prompt.volumeValue.toLocaleString() : '0'}
+                                      {prompt.volumeValue
+                                        ? prompt.volumeValue.toLocaleString()
+                                        : "0"}
                                     </span>
                                   </TableCell>
                                   <TableCell className="text-center py-3">
@@ -819,7 +1022,9 @@ const PromptsPage = () => {
                                   </TableCell>
                                   <TableCell className="text-center py-3">
                                     <span className="text-sm text-muted-foreground">
-                                      {prompt.location !== '—' ? prompt.location : '—'}
+                                      {prompt.location !== "—"
+                                        ? prompt.location
+                                        : "—"}
                                     </span>
                                   </TableCell>
                                   <TableCell className="text-center py-3">
@@ -904,7 +1109,10 @@ const PromptsPage = () => {
                         <TableCell className="py-3">
                           <button
                             onClick={() => {
-                              console.log("Navigating to prompt (suggested):", prompt.id);
+                              console.log(
+                                "Navigating to prompt (suggested):",
+                                prompt.id
+                              );
                               navigate(`/dashboard/prompts/${prompt.id}`);
                             }}
                             className="text-sm text-left hover:text-blue-600 hover:underline transition-colors cursor-pointer"
@@ -914,7 +1122,9 @@ const PromptsPage = () => {
                         </TableCell>
                         <TableCell className="text-center py-3">
                           <span className="text-sm font-medium">
-                            {prompt.volumeValue ? prompt.volumeValue.toLocaleString() : '0'}
+                            {prompt.volumeValue
+                              ? prompt.volumeValue.toLocaleString()
+                              : "0"}
                           </span>
                         </TableCell>
                         <TableCell className="text-center py-3">
@@ -966,7 +1176,7 @@ const PromptsPage = () => {
                             <TableHead className="font-medium text-xs min-w-[300px] sticky left-[40px] bg-background z-10">
                               Prompt
                             </TableHead>
-                            
+
                             <TableHead className="font-medium text-xs text-center min-w-[120px]">
                               Mentions
                             </TableHead>
@@ -1014,7 +1224,7 @@ const PromptsPage = () => {
                               <TableCell className="py-3 sticky left-[40px] bg-background">
                                 <p className="text-sm">{prompt.prompt}</p>
                               </TableCell>
-                              
+
                               <TableCell className="py-3">
                                 <div className="flex items-center justify-center gap-1">
                                   {prompt.mentions.map((mention, idx) => (
@@ -1036,7 +1246,9 @@ const PromptsPage = () => {
                               </TableCell>
                               <TableCell className="text-center py-3">
                                 <span className="text-sm font-medium">
-                                  {prompt.volumeValue ? prompt.volumeValue.toLocaleString() : '0'}
+                                  {prompt.volumeValue
+                                    ? prompt.volumeValue.toLocaleString()
+                                    : "0"}
                                 </span>
                               </TableCell>
                               <TableCell className="text-center py-3">
@@ -1173,7 +1385,7 @@ const PromptsPage = () => {
           <div className="relative bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 px-8 py-8">
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
-            
+
             <DialogHeader className="relative space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center">
@@ -1232,8 +1444,8 @@ const PromptsPage = () => {
               <div className="space-y-6">
                 {/* Prompt Field */}
                 <div className="space-y-2.5">
-                  <Label 
-                    htmlFor="prompt" 
+                  <Label
+                    htmlFor="prompt"
                     className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2"
                   >
                     <FileText className="w-4 h-4 text-purple-600" />
@@ -1264,8 +1476,8 @@ const PromptsPage = () => {
 
                 {/* Country Field */}
                 <div className="space-y-2.5">
-                  <Label 
-                    htmlFor="country" 
+                  <Label
+                    htmlFor="country"
                     className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2"
                   >
                     <Globe2 className="w-4 h-4 text-blue-600" />
@@ -1275,7 +1487,10 @@ const PromptsPage = () => {
                     value={selectedCountry}
                     onValueChange={setSelectedCountry}
                   >
-                    <SelectTrigger id="country" className="h-12 border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 rounded-xl">
+                    <SelectTrigger
+                      id="country"
+                      className="h-12 border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 rounded-xl"
+                    >
                       <SelectValue>
                         <div className="flex items-center gap-2">
                           <span className="text-lg">🇮🇳</span>
@@ -1311,58 +1526,106 @@ const PromptsPage = () => {
                 </div>
 
                 {/* Tags Field */}
-                <div className="space-y-2.5">
-                  <Label 
-                    htmlFor="tags" 
-                    className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2"
-                  >
-                    <Tag className="w-4 h-4 text-green-600" />
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-blue-600" />
                     Tags
-                    <span className="text-xs font-normal text-gray-500">(Optional)</span>
+                    <span className="text-xs font-normal text-gray-500">
+                      (Optional)
+                    </span>
                   </Label>
+
+                  {/* Selected Tags */}
                   {selectedTags.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap mb-2">
-                      {selectedTags.map((tag, idx) => (
-                        <Badge key={idx} variant="secondary" className="text-xs px-3 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                          {tag}
-                          <button
-                            onClick={() => handleRemoveTag(tag)}
-                            className="ml-1.5 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                    <div className="flex items-center gap-2 flex-wrap p-3 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl border border-blue-200/50 dark:border-blue-800/50">
+                      {selectedTags.map((tagName, idx) => {
+                        const tagColor =
+                          availableTags.find((t) => t.name === tagName)
+                            ?.color || "#3b82f6";
+                        return (
+                          <Badge
+                            key={idx}
+                            className="text-xs px-3 py-1.5 font-medium shadow-sm"
+                            style={{
+                              backgroundColor: tagColor + "20",
+                              color: tagColor,
+                              border: `1px solid ${tagColor}40`,
+                            }}
                           >
-                            ×
-                          </button>
-                        </Badge>
-                      ))}
+                            {tagName}
+                            <button
+                              onClick={() => handleRemoveTag(tagName)}
+                              className="ml-2 hover:opacity-70 transition-opacity"
+                            >
+                              ×
+                            </button>
+                          </Badge>
+                        );
+                      })}
                     </div>
                   )}
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="tags"
-                      placeholder="Enter tag name and press Enter"
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleAddTag();
+
+                  {/* Available Tags - Quick Select */}
+                  {availableTags.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                        <Sparkles className="w-3 h-3 text-blue-500" />
+                        Click to add tags:
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                        {availableTags
+                          .filter((tag) => !selectedTags.includes(tag.name))
+                          .map((tag) => (
+                            <Badge
+                              key={tag.id}
+                              className="cursor-pointer text-xs px-3 py-1.5 hover:shadow-md transition-all hover:scale-105"
+                              style={{
+                                backgroundColor: tag.color + "15",
+                                color: tag.color,
+                                border: `1px solid ${tag.color}30`,
+                              }}
+                              onClick={() => {
+                                if (!selectedTags.includes(tag.name)) {
+                                  setSelectedTags([...selectedTags, tag.name]);
+                                }
+                              }}
+                            >
+                              {tag.name}
+                            </Badge>
+                          ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 px-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border border-dashed border-blue-300 dark:border-blue-700">
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+                        💡 No tags available yet.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          navigate("/dashboard/tags?createNew=true")
                         }
-                      }}
-                      className="flex-1 h-12 border-2 border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all duration-200 rounded-xl"
-                    />
+                        className="h-8 text-xs bg-white dark:bg-gray-900 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-400 dark:border-blue-600"
+                      >
+                        <Plus className="w-3 h-3 mr-1.5" />
+                        Create Your First Tag
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Create New Tag Button */}
+                  {availableTags.length > 0 && (
                     <Button
                       variant="outline"
-                      size="icon"
-                      className="h-12 w-12 rounded-xl border-2 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all"
-                      onClick={handleAddTag}
-                      type="button"
+                      size="sm"
+                      onClick={() => navigate("/dashboard/tags?createNew=true")}
+                      className="w-full h-9 text-xs bg-gradient-to-r from-blue-500/10 to-purple-500/10 hover:from-blue-500/20 hover:to-purple-500/20 border-blue-300 dark:border-blue-700 hover:border-blue-400"
                     >
-                      <Plus className="w-4 h-4" />
+                      <Plus className="w-3.5 h-3.5 mr-1.5" />
+                      Create New Tag
                     </Button>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 pl-1">
-                    <span className="w-1 h-1 rounded-full bg-green-500"></span>
-                    Add tags to organize and categorize your prompts
-                  </p>
+                  )}
                 </div>
               </div>
 
@@ -1455,17 +1718,19 @@ const PromptsPage = () => {
                   className="hidden"
                   id="file-upload"
                 />
-                
+
                 <div
                   className={`w-full border-2 border-dashed rounded-lg p-12 transition-colors cursor-pointer ${
-                    isDragOver 
-                      ? 'border-blue-400 bg-blue-50' 
-                      : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+                    isDragOver
+                      ? "border-blue-400 bg-blue-50"
+                      : "border-muted-foreground/25 hover:border-muted-foreground/50"
                   }`}
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
-                  onClick={() => document.getElementById('file-upload')?.click()}
+                  onClick={() =>
+                    document.getElementById("file-upload")?.click()
+                  }
                 >
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
@@ -1489,13 +1754,25 @@ const PromptsPage = () => {
                   <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                        <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        <svg
+                          className="w-4 h-4 text-green-600"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
                         </svg>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-green-800">{uploadedFile.name}</p>
-                        <p className="text-xs text-green-600">{(uploadedFile.size / 1024).toFixed(1)} KB</p>
+                        <p className="text-sm font-medium text-green-800">
+                          {uploadedFile.name}
+                        </p>
+                        <p className="text-xs text-green-600">
+                          {(uploadedFile.size / 1024).toFixed(1)} KB
+                        </p>
                       </div>
                     </div>
                     <Button

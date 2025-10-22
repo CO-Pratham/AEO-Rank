@@ -63,6 +63,7 @@ import {
   setLoading,
 } from "@/store/slices/competitorsSlice";
 import { getDomainLogo, generateInitials } from "@/utils/logoUtils";
+import { useToast } from "@/hooks/use-toast";
 
 interface SuggestedCompetitor {
   id: number;
@@ -83,6 +84,7 @@ interface YourCompetitor {
 const CompetitorsPage = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { competitors, suggestedCompetitors, loading } = useSelector(
     (state: RootState) => state.competitors
   );
@@ -101,8 +103,6 @@ const CompetitorsPage = () => {
   const [selectedCompetitor, setSelectedCompetitor] =
     useState<YourCompetitor | null>(null);
 
-
-
   // Handle view details
   const handleViewDetails = (competitor: YourCompetitor) => {
     setSelectedCompetitor(competitor);
@@ -119,41 +119,92 @@ const CompetitorsPage = () => {
   const confirmRemoveCompetitor = async () => {
     if (!competitorToRemove) return;
 
+    const competitorName = competitorToRemove.name;
+    const competitorId = competitorToRemove.id;
+
     try {
       const token = localStorage.getItem("accessToken");
 
-      // Call API to remove competitor
+      // Optimistically remove from UI first for instant feedback
+      setExistingCompetitors((prev) => 
+        prev.filter((comp) => comp.id !== competitorId)
+      );
+      dispatch(
+        setCompetitors(
+          competitors.filter((comp) => comp.id !== competitorId)
+        )
+      );
+
+      // Close dialog immediately
+      setRemoveDialogOpen(false);
+      setCompetitorToRemove(null);
+
+      // Get domain from website - clean it to just domain without protocol
+      let domain = competitorToRemove.website;
+      
+      // Remove protocol (http:// or https://) and www.
+      if (domain) {
+        domain = domain
+          .replace(/^https?:\/\//i, "")  // Remove http:// or https://
+          .replace(/^www\./i, "")         // Remove www.
+          .replace(/\/.*$/, "");          // Remove any path after domain
+      }
+
+      // Call API to remove competitor using clean domain (e.g., bmw.com)
+      const requestBody = {
+        domain: domain,
+      };
+      
+      console.log("🗑️ Delete request URL:", `https://aeotest-production.up.railway.app/user/competitor/delete`);
+      console.log("🗑️ Delete request method:", "DELETE");
+      console.log("🗑️ Delete request body:", JSON.stringify(requestBody, null, 2));
+
       const response = await fetch(
-        `https://aeotest-production.up.railway.app/user/competitor/${competitorToRemove.name}`,
+        `https://aeotest-production.up.railway.app/user/competitor/delete`,
         {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
+          body: JSON.stringify(requestBody),
         }
       );
 
+      console.log("✅ Delete response status:", response.status);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.log("❌ Delete error response:", errorText);
         throw new Error("Failed to remove competitor from server");
       }
 
-      console.log("Competitor removed successfully, re-fetching data...");
-
-      // Re-fetch all competitors from server to get fresh data
-      await fetchExistingCompetitorsData();
+      const responseData = await response.json();
+      console.log("✅ Delete success response:", responseData);
+      console.log("✅ Competitor removed successfully from backend:", competitorName);
 
       // Force a page reload event to update dashboard and other pages
-      window.dispatchEvent(new Event('competitor-updated'));
+      console.log("Dispatching competitor-updated event...");
+      window.dispatchEvent(new Event("competitor-updated"));
 
-      // Close dialog
-      setRemoveDialogOpen(false);
-      setCompetitorToRemove(null);
+      // Show success toast
+      toast({
+        title: "Competitor removed",
+        description: `${competitorName} has been removed successfully.`,
+      });
 
-      console.log("Competitor removed:", competitorToRemove.name);
     } catch (error) {
       console.error("Error removing competitor:", error);
-      alert("Failed to remove competitor. Please try again.");
+      
+      // Show error toast
+      toast({
+        title: "Failed to remove competitor",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+      
+      // Re-fetch to restore the data if delete failed
+      await fetchExistingCompetitorsData();
     }
   };
 
@@ -169,9 +220,9 @@ const CompetitorsPage = () => {
         return;
       }
 
-      // Only fetch from /analyse/brand/get
+      // Fetch from /user/getcompetitor to get all existing competitors
       const response = await fetch(
-        "https://aeotest-production.up.railway.app/analyse/brand/get",
+        "https://aeotest-production.up.railway.app/user/getcompetitor",
         {
           method: "GET",
           headers: {
@@ -181,54 +232,110 @@ const CompetitorsPage = () => {
         }
       );
 
-      console.log("Analysis Response Status:", response.status);
+      console.log("User Competitors Response Status:", response.status);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch competitors: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log("Competitors API Response:", data);
+      console.log("User Competitors API Response:", data);
+
+      // Handle different response formats
+      let competitorsArray: any[] = [];
+      if (Array.isArray(data)) {
+        competitorsArray = data;
+      } else if (data && data.competitors && Array.isArray(data.competitors)) {
+        competitorsArray = data.competitors;
+      } else if (data && data.data && Array.isArray(data.data)) {
+        competitorsArray = data.data;
+      }
+
+      console.log("Competitors Array:", competitorsArray);
+      console.log("Total competitors fetched:", competitorsArray.length);
+      if (competitorsArray.length > 0) {
+        console.log("First competitor item:", competitorsArray[0]);
+        console.log("All fields:", Object.keys(competitorsArray[0]));
+        console.log("Stringified first item:", JSON.stringify(competitorsArray[0], null, 2));
+      }
 
       // Transform the API response to match our interface
-      if (Array.isArray(data) && data.length > 0) {
-        const transformedData = data.map((item: any, index: number) => {
+      if (competitorsArray.length > 0) {
+        const transformedData = competitorsArray.map((item: any, index: number) => {
+          // Extract brand name from ALL possible fields in the object
+          let brandName = '';
+          
+          // Try all common field name variations
+          const possibleNameFields = [
+            'brand_name', 'brandName', 'brand', 'name', 
+            'competitor_name', 'competitorName', 'competitor',
+            'Brand_Name', 'BrandName', 'Brand', 'Name',
+            'Competitor_Name', 'CompetitorName', 'Competitor'
+          ];
+          
+          for (const field of possibleNameFields) {
+            if (item[field] && typeof item[field] === 'string' && item[field].trim()) {
+              brandName = item[field].trim();
+              break;
+            }
+          }
+          
+          // If still no brand name, use the first string value in the object
+          if (!brandName) {
+            for (const [key, value] of Object.entries(item)) {
+              if (typeof value === 'string' && value.trim() && !key.toLowerCase().includes('id')) {
+                brandName = value.trim();
+                console.log(`Using field '${key}' as brand name:`, value);
+                break;
+              }
+            }
+          }
+          
+          // Last resort: use fallback
+          if (!brandName) {
+            brandName = `Competitor ${index + 1}`;
+          }
+
+          console.log(`Item ${index}:`, {
+            allFields: item,
+            extractedName: brandName
+          });
+
           // Extract clean domain from provided data
           let domain = item.domain || item.website || "";
-          
+
           // Clean domain: remove protocol, www, and trailing slashes
           if (domain) {
             domain = domain
-              .replace(/^https?:\/\//i, '')
-              .replace(/^www\./i, '')
-              .replace(/\/.*$/, '');
+              .replace(/^https?:\/\//i, "")
+              .replace(/^www\./i, "")
+              .replace(/\/.*$/, "");
           }
-          
+
           // If no domain provided, construct from brand name
           if (!domain) {
-            domain = (item.brand_name || item.brand || item.name || `competitor${index + 1}`)
-              .toLowerCase()
-              .replace(/\s+/g, "") + ".com";
+            domain = brandName.toLowerCase().replace(/\s+/g, "") + ".com";
           }
-          
+
           return {
             id: index + 1,
-            name:
-              item.brand_name ||
-              item.brand ||
-              item.name ||
-              `Competitor ${index + 1}`,
+            name: brandName,
             logo: getDomainLogo(domain, item.logo),
-            website: domain.startsWith('http') ? domain : `https://${domain}`,
+            website: domain.startsWith("http") ? domain : `https://${domain}`,
             isYourBrand: false,
           };
         });
         setExistingCompetitors(transformedData);
 
         // Store in Redux as well with actual visibility/sentiment/position from API
-        const reduxCompetitors = data.map((item: any, index: number) => ({
+        const reduxCompetitors = competitorsArray.map((item: any, index: number) => {
+          // Use the same name extraction as transformedData
+          const correspondingItem = transformedData[index];
+          const brandName = correspondingItem ? correspondingItem.name : `Competitor ${index + 1}`;
+          
+          return {
           id: index + 1,
-          name: item.brand_name || item.brand || item.name || `Competitor ${index + 1}`,
+          name: brandName,
           domain: item.domain || item.website || "",
           logo: transformedData[index]?.logo || "",
           visibility: `${Math.round(Number(item.avg_visibility) || 0)}%`,
@@ -237,7 +344,8 @@ const CompetitorsPage = () => {
             : undefined,
           position: `#${index + 1}`,
           addedAt: new Date().toISOString(),
-        }));
+        };
+        });
         dispatch(setCompetitors(reduxCompetitors));
       } else {
         setExistingCompetitors([]);
@@ -252,10 +360,11 @@ const CompetitorsPage = () => {
     }
   };
 
-  // Fetch existing competitors from /analyse/brand/get API on mount
+  // Fetch existing competitors from /user/competitor API on mount only
   useEffect(() => {
     fetchExistingCompetitorsData();
-  }, [dispatch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   // Fetch suggested competitors from /competitor/generate API
   useEffect(() => {
@@ -302,22 +411,23 @@ const CompetitorsPage = () => {
           ? data.map((item: any, index: number) => {
               // Extract clean domain from provided data
               let domain = item.domain || item.website || "";
-              
+
               // Clean domain: remove protocol, www, and trailing slashes
               if (domain) {
                 domain = domain
-                  .replace(/^https?:\/\//i, '')
-                  .replace(/^www\./i, '')
-                  .replace(/\/.*$/, '');
+                  .replace(/^https?:\/\//i, "")
+                  .replace(/^www\./i, "")
+                  .replace(/\/.*$/, "");
               }
-              
+
               // If no domain provided, construct from brand name
               if (!domain) {
-                domain = (item.brand_name || item.name || `competitor${index + 1}`)
-                  .toLowerCase()
-                  .replace(/\s+/g, "") + ".com";
+                domain =
+                  (item.brand_name || item.name || `competitor${index + 1}`)
+                    .toLowerCase()
+                    .replace(/\s+/g, "") + ".com";
               }
-              
+
               return {
                 id: Date.now() + index,
                 name:
@@ -326,7 +436,8 @@ const CompetitorsPage = () => {
                   item.competitor ||
                   `Competitor ${index + 1}`,
                 logo: getDomainLogo(domain, item.logo),
-                mentions: item.mentions || Math.floor(Math.random() * 1000) + 100,
+                mentions:
+                  item.mentions || Math.floor(Math.random() * 1000) + 100,
                 domain: domain,
                 visibility: "0%",
                 sentiment: "—",
@@ -353,8 +464,10 @@ const CompetitorsPage = () => {
     existingCompetitors.length > 0
       ? existingCompetitors
       : competitors.map((comp) => {
-          const domain = (comp.domain || comp.name.toLowerCase().replace(/\s+/g, "")) + ".com";
-          
+          const domain =
+            (comp.domain || comp.name.toLowerCase().replace(/\s+/g, "")) +
+            ".com";
+
           return {
             id: comp.id,
             name: comp.name,
@@ -364,8 +477,14 @@ const CompetitorsPage = () => {
           };
         });
 
+  // Debug: Log competitors data
+  console.log("Your Competitors to display:", yourCompetitors);
+  console.log("Existing Competitors:", existingCompetitors);
+  console.log("Redux Competitors:", competitors);
+
   const handleTrack = async (competitor: SuggestedCompetitor) => {
     try {
+      dispatch(setLoading(true));
       const token = localStorage.getItem("accessToken");
 
       console.log("Tracking competitor:", competitor);
@@ -374,14 +493,27 @@ const CompetitorsPage = () => {
       let cleanDomain = competitor.domain || "";
       if (cleanDomain) {
         cleanDomain = cleanDomain
-          .replace(/^https?:\/\//i, '')
-          .replace(/^www\./i, '')
-          .replace(/\/.*$/, '');
+          .replace(/^https?:\/\//i, "")
+          .replace(/^www\./i, "")
+          .replace(/\/.*$/, "");
       } else {
-        cleanDomain = competitor.name.toLowerCase().replace(/\s+/g, "") + ".com";
+        cleanDomain =
+          competitor.name.toLowerCase().replace(/\s+/g, "") + ".com";
       }
 
       // Call API to add competitor
+      const requestBody = [
+        {
+          brand_name: competitor.name,
+          domain: cleanDomain,
+          country: brand?.location || brand?.country || "US",
+        },
+      ];
+
+      console.log("➕ Add competitor (suggested) request URL:", "https://aeotest-production.up.railway.app/user/competitor");
+      console.log("➕ Add competitor (suggested) request method:", "POST");
+      console.log("➕ Add competitor (suggested) request body:", JSON.stringify(requestBody, null, 2));
+
       const response = await fetch(
         "https://aeotest-production.up.railway.app/user/competitor",
         {
@@ -390,34 +522,59 @@ const CompetitorsPage = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify([
-            {
-              brand_name: competitor.name,
-              domain: cleanDomain,
-              country: brand?.location || brand?.country || "US",
-            },
-          ]),
+          body: JSON.stringify(requestBody),
         }
       );
 
+      console.log("✅ Add competitor (suggested) response status:", response.status);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error("Failed to add competitor:", errorData);
+        console.error("❌ Failed to add competitor:", errorData);
         throw new Error(
           errorData.message || "Failed to add competitor to server"
         );
       }
 
-      console.log("Competitor added successfully, re-fetching data...");
-
-      // Re-fetch all competitors from server to get fresh data with visibility/sentiment/position
-      await fetchExistingCompetitorsData();
+      const data = await response.json();
+      console.log("✅ Add competitor (suggested) success response:", data);
+      console.log("✅ Competitor added successfully:", competitor.name);
 
       // Remove from suggested list
       dispatch(removeSuggestedCompetitor(competitor.id));
+
+      // Add to existing competitors optimistically
+      const newCompetitor: YourCompetitor = {
+        id: Date.now(),
+        name: competitor.name,
+        logo: competitor.logo,
+        website: cleanDomain.startsWith("http") ? cleanDomain : `https://${cleanDomain}`,
+        isYourBrand: false,
+      };
+      setExistingCompetitors((prev) => {
+        const updated = [...prev, newCompetitor];
+        console.log("Updated competitors after add:", updated);
+        return updated;
+      });
+
+      // Dispatch a custom event to notify other components
+      console.log("Dispatching competitor-updated event...");
+      window.dispatchEvent(new Event("competitor-updated"));
+
+      // Show success toast
+      toast({
+        title: "Competitor added",
+        description: `${competitor.name} is now being tracked.`,
+      });
     } catch (error) {
       console.error("Error adding competitor:", error);
-      alert("Failed to add competitor. Please try again.");
+      toast({
+        title: "Failed to add competitor",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      dispatch(setLoading(false));
     }
   };
 
@@ -427,26 +584,51 @@ const CompetitorsPage = () => {
 
   const handleAddCompetitor = async () => {
     if (!newCompetitorName.trim()) {
-      alert("Please enter a competitor name");
+      toast({
+        title: "Name required",
+        description: "Please enter a competitor name.",
+        variant: "destructive",
+      });
       return;
     }
 
     if (!newCompetitorDomain.trim()) {
-      alert("Please enter a competitor domain");
+      toast({
+        title: "Domain required",
+        description: "Please enter a competitor domain.",
+        variant: "destructive",
+      });
       return;
     }
 
     try {
+      dispatch(setLoading(true));
       const token = localStorage.getItem("accessToken");
 
       // Clean domain for API request and logo fetching
       let cleanDomain = newCompetitorDomain.trim();
       cleanDomain = cleanDomain
-        .replace(/^https?:\/\//i, '')
-        .replace(/^www\./i, '')
-        .replace(/\/.*$/, '');
+        .replace(/^https?:\/\//i, "")
+        .replace(/^www\./i, "")
+        .replace(/\/.*$/, "");
 
       // Call API to add competitor
+      const requestBody = [
+        {
+          brand_name: newCompetitorName.trim(),
+          domain: cleanDomain,
+          country:
+            newCompetitorCountry.trim() ||
+            brand?.location ||
+            brand?.country ||
+            "US",
+        },
+      ];
+
+      console.log("➕ Add competitor (manual) request URL:", "https://aeotest-production.up.railway.app/user/competitor");
+      console.log("➕ Add competitor (manual) request method:", "POST");
+      console.log("➕ Add competitor (manual) request body:", JSON.stringify(requestBody, null, 2));
+
       const response = await fetch(
         "https://aeotest-production.up.railway.app/user/competitor",
         {
@@ -455,36 +637,65 @@ const CompetitorsPage = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify([
-            {
-              brand_name: newCompetitorName.trim(),
-              domain: cleanDomain,
-              country:
-                newCompetitorCountry.trim() ||
-                brand?.location ||
-                brand?.country ||
-                "US",
-            },
-          ]),
+          body: JSON.stringify(requestBody),
         }
       );
 
+      console.log("✅ Add competitor (manual) response status:", response.status);
+
       if (!response.ok) {
-        throw new Error("Failed to add competitor to server");
+        const errorData = await response.json().catch(() => ({}));
+        console.error("❌ Failed to add competitor:", errorData);
+        throw new Error(
+          errorData.message || "Failed to add competitor to server"
+        );
       }
 
-      console.log("Competitor added successfully, re-fetching data...");
+      const data = await response.json();
+      console.log("✅ Add competitor (manual) success response:", data);
+      
+      // Store the name for success message
+      const addedName = newCompetitorName.trim();
+      console.log("✅ Competitor added successfully:", addedName);
 
-      // Re-fetch all competitors from server to get fresh data with visibility/sentiment/position
-      await fetchExistingCompetitorsData();
+      // Add to existing competitors optimistically
+      const newCompetitor: YourCompetitor = {
+        id: Date.now(),
+        name: addedName,
+        logo: getDomainLogo(cleanDomain, ""),
+        website: cleanDomain.startsWith("http") ? cleanDomain : `https://${cleanDomain}`,
+        isYourBrand: false,
+      };
+      setExistingCompetitors((prev) => {
+        const updated = [...prev, newCompetitor];
+        console.log("Updated competitors after add:", updated);
+        return updated;
+      });
 
+      // Clear form fields and close dialog
       setNewCompetitorName("");
       setNewCompetitorDomain("");
       setNewCompetitorCountry("");
       setAddDialogOpen(false);
+
+      // Dispatch a custom event to notify other components
+      console.log("Dispatching competitor-updated event...");
+      window.dispatchEvent(new Event("competitor-updated"));
+
+      // Show success toast
+      toast({
+        title: "Competitor added",
+        description: `${addedName} has been added successfully.`,
+      });
     } catch (error) {
       console.error("Error adding competitor:", error);
-      alert("Failed to add competitor. Please try again.");
+      toast({
+        title: "Failed to add competitor",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      dispatch(setLoading(false));
     }
   };
 
@@ -554,22 +765,23 @@ const CompetitorsPage = () => {
               >
                 <CardContent className="p-6">
                   <div className="flex flex-col items-center text-center space-y-4">
-                    <div className="w-16 h-16 rounded-2xl bg-white border-2 border-border/30 shadow-sm flex items-center justify-center group-hover:shadow-md transition-shadow">
+                    <div className="w-16 h-16 rounded-2xl bg-white border border-border/20 shadow-sm flex items-center justify-center group-hover:shadow-md transition-shadow overflow-hidden">
                       {competitor.logo ? (
                         <img
                           src={competitor.logo}
                           alt={competitor.name}
-                          className="w-12 h-12 rounded-xl object-cover"
+                          className="w-full h-full object-contain p-2"
                           onError={(e) => {
                             e.currentTarget.style.display = "none";
-                            const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                            const fallback = e.currentTarget
+                              .nextElementSibling as HTMLElement | null;
                             if (fallback) fallback.style.display = "flex";
                           }}
                         />
                       ) : null}
-                      <span 
-                        className="text-2xl font-bold text-gray-800"
-                        style={{ display: competitor.logo ? 'none' : 'flex' }}
+                      <span
+                        className="text-2xl font-bold text-gray-600"
+                        style={{ display: competitor.logo ? "none" : "flex" }}
                       >
                         {generateInitials(competitor.name)}
                       </span>
@@ -648,7 +860,9 @@ const CompetitorsPage = () => {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {yourCompetitors.map((competitor) => (
+            {yourCompetitors.map((competitor) => {
+              console.log("Rendering competitor card:", competitor);
+              return (
               <Card
                 key={competitor.id}
                 className="border border-border bg-card hover:bg-accent/5 transition-all duration-200 shadow-sm hover:shadow-md relative overflow-hidden"
@@ -657,59 +871,79 @@ const CompetitorsPage = () => {
                   <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-orange-400 to-amber-500" />
                 )}
                 <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-md flex items-center justify-center text-white font-bold text-lg">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-12 h-12 rounded-xl border border-border/20 bg-white shadow-sm flex items-center justify-center flex-shrink-0 overflow-hidden">
                         {competitor.logo ? (
                           <img
                             src={competitor.logo}
                             alt={competitor.name}
-                            className="w-8 h-8 rounded-lg object-cover"
+                            className="w-full h-full object-contain p-1"
                             onError={(e) => {
+                              console.log("Logo failed to load for:", competitor.name);
                               e.currentTarget.style.display = "none";
-                              const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                              const fallback = e.currentTarget
+                                .nextElementSibling as HTMLElement | null;
                               if (fallback) fallback.style.display = "flex";
                             }}
                           />
                         ) : null}
-                        <span 
-                          className="text-lg font-bold"
-                          style={{ display: competitor.logo ? 'none' : 'flex' }}
+                        <span
+                          className="text-lg font-bold text-gray-600"
+                          style={{ display: competitor.logo ? "none" : "flex" }}
                         >
-                          {generateInitials(competitor.name)}
+                          {generateInitials(competitor.name || "C")}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-semibold text-base text-foreground">
-                            {competitor.name}
+                            {competitor.name || "Unknown Competitor"}
                           </h3>
                           {competitor.isYourBrand && (
                             <Badge
                               variant="secondary"
-                              className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-0 text-[10px] px-1.5 py-0 font-semibold"
+                              className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-0 text-[10px] px-1.5 py-0 font-semibold flex-shrink-0"
                             >
                               You
                             </Badge>
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground truncate">
-                          {competitor.website}
+                          {competitor.website || "No website"}
                         </p>
                       </div>
                     </div>
-                    {!competitor.isYourBrand && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent rounded-lg"
-                          >
-                            <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-accent rounded-lg flex-shrink-0"
+                        >
+                          <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        {!competitor.isYourBrand && (
+                          <>
+                            <DropdownMenuItem
+                              onClick={() => handleViewDetails(competitor)}
+                              className="text-sm cursor-pointer"
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-600 text-sm cursor-pointer"
+                              onClick={() => handleRemoveCompetitor(competitor)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Remove
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                        {competitor.isYourBrand && (
                           <DropdownMenuItem
                             onClick={() => handleViewDetails(competitor)}
                             className="text-sm cursor-pointer"
@@ -717,20 +951,14 @@ const CompetitorsPage = () => {
                             <Eye className="w-4 h-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-600 text-sm cursor-pointer"
-                            onClick={() => handleRemoveCompetitor(competitor)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Remove
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>
@@ -827,7 +1055,10 @@ const CompetitorsPage = () => {
                     (Optional)
                   </span>
                 </Label>
-                <Select value={newCompetitorCountry} onValueChange={setNewCompetitorCountry}>
+                <Select
+                  value={newCompetitorCountry}
+                  onValueChange={setNewCompetitorCountry}
+                >
                   <SelectTrigger className="h-12 text-base border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all duration-200 rounded-xl">
                     <SelectValue placeholder="Select country">
                       {newCompetitorCountry && (
@@ -969,16 +1200,20 @@ const CompetitorsPage = () => {
                     className="w-12 h-12 rounded-xl object-cover"
                     onError={(e) => {
                       e.currentTarget.style.display = "none";
-                      const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                      const fallback = e.currentTarget
+                        .nextElementSibling as HTMLElement | null;
                       if (fallback) fallback.style.display = "flex";
                     }}
                   />
                 ) : null}
-                <span 
+                <span
                   className="text-2xl font-bold"
-                  style={{ display: selectedCompetitor?.logo ? 'none' : 'flex' }}
+                  style={{
+                    display: selectedCompetitor?.logo ? "none" : "flex",
+                  }}
                 >
-                  {selectedCompetitor && generateInitials(selectedCompetitor.name)}
+                  {selectedCompetitor &&
+                    generateInitials(selectedCompetitor.name)}
                 </span>
               </div>
               <div className="flex-1">
@@ -994,7 +1229,10 @@ const CompetitorsPage = () => {
                       Your Brand
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="border-border/50 font-semibold bg-blue-50 text-blue-700 border-blue-200">
+                    <Badge
+                      variant="outline"
+                      className="border-border/50 font-semibold bg-blue-50 text-blue-700 border-blue-200"
+                    >
                       Competitor
                     </Badge>
                   )}
@@ -1002,7 +1240,7 @@ const CompetitorsPage = () => {
               </div>
             </div>
           </DialogHeader>
-          
+
           <div className="grid grid-cols-2 gap-4 py-2">
             {/* Website */}
             <div className="bg-gradient-to-br from-blue-50/50 to-cyan-50/30 rounded-xl p-4 border border-blue-100">
@@ -1010,7 +1248,7 @@ const CompetitorsPage = () => {
                 <Globe className="w-4 h-4" />
                 Website
               </label>
-              <a 
+              <a
                 href={`https://${selectedCompetitor?.website}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -1020,7 +1258,7 @@ const CompetitorsPage = () => {
                 <ExternalLink className="w-4 h-4 flex-shrink-0" />
               </a>
             </div>
-            
+
             {/* Tracking Status */}
             <div className="bg-gradient-to-br from-green-50/50 to-emerald-50/30 rounded-xl p-4 border border-green-100">
               <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-2 mb-3">
@@ -1034,7 +1272,7 @@ const CompetitorsPage = () => {
                 </p>
               </div>
             </div>
-            
+
             {/* Visibility */}
             <div className="bg-gradient-to-br from-purple-50/50 to-pink-50/30 rounded-xl p-4 border border-purple-100">
               <label className="text-xs font-semibold text-purple-700 uppercase tracking-wide flex items-center gap-2 mb-3">
@@ -1048,7 +1286,7 @@ const CompetitorsPage = () => {
                 Across all models
               </p>
             </div>
-            
+
             {/* Date Added */}
             <div className="bg-gradient-to-br from-orange-50/50 to-amber-50/30 rounded-xl p-4 border border-orange-100">
               <label className="text-xs font-semibold text-orange-700 uppercase tracking-wide flex items-center gap-2 mb-3">
@@ -1056,10 +1294,10 @@ const CompetitorsPage = () => {
                 Date Added
               </label>
               <p className="text-sm text-foreground font-semibold">
-                {new Date().toLocaleDateString('en-US', { 
-                  month: 'short', 
-                  day: 'numeric', 
-                  year: 'numeric' 
+                {new Date().toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
                 })}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
@@ -1067,18 +1305,18 @@ const CompetitorsPage = () => {
               </p>
             </div>
           </div>
-          
+
           {/* Additional Info */}
           <div className="bg-muted/30 rounded-xl p-4 border border-border/50 mt-4">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
               About
             </label>
             <p className="text-sm text-foreground">
-              This competitor is being tracked across all AI models and platforms. 
-              Monitor their visibility and performance in real-time.
+              This competitor is being tracked across all AI models and
+              platforms. Monitor their visibility and performance in real-time.
             </p>
           </div>
-          
+
           <DialogFooter className="pt-4 gap-2">
             <Button
               variant="outline"
@@ -1091,7 +1329,7 @@ const CompetitorsPage = () => {
               className="h-10 px-6 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
               onClick={() => {
                 setViewDetailsDialogOpen(false);
-                navigate('/dashboard/ranking');
+                navigate("/dashboard/ranking");
               }}
             >
               View Rankings

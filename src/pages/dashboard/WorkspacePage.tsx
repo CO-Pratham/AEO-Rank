@@ -11,12 +11,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Home, Save, FileText } from "lucide-react";
+import { Home, Save, FileText, Edit2 } from "lucide-react";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { useBrand } from "@/context/BrandContext";
 import { useToast } from "@/hooks/use-toast";
 import { useSearchParams } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import PricingSection from "@/components/PricingSection";
+import { apiCall } from "@/utils/api";
 
 import chatgptIcon from "@/assets/logos/chatgpt-icon.svg";
 import geminiIcon from "@/assets/logos/google-gemini-icon.svg";
@@ -26,6 +38,7 @@ import googleAiStudioIcon from "@/assets/logos/google-ai-studio-icon.svg";
 
 const WorkspacePage = () => {
   const { currentWorkspace, addWorkspace, updateWorkspace } = useWorkspace();
+  const { brand, loading: brandLoading, refetch: refetchBrand } = useBrand();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const isNewWorkspace = searchParams.get('new') === 'true';
@@ -36,6 +49,9 @@ const WorkspacePage = () => {
   const [domain, setDomain] = useState("");
   const [ipAddress, setIpAddress] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [showEditWarning, setShowEditWarning] = useState(false);
+  const [isUpdatingBrand, setIsUpdatingBrand] = useState(false);
 
   const [models, setModels] = useState({
     chatgpt: true,
@@ -47,17 +63,37 @@ const WorkspacePage = () => {
     claudeSonnet4: false,
   });
 
+  // Helper function to map location to IP address dropdown value
+  const mapLocationToIpAddress = (location: string) => {
+    const locationLower = location.toLowerCase();
+    if (locationLower.includes('india') || locationLower.includes('in')) return 'india';
+    if (locationLower.includes('united states') || locationLower.includes('usa') || locationLower.includes('us')) return 'usa';
+    if (locationLower.includes('united kingdom') || locationLower.includes('uk') || locationLower.includes('britain')) return 'uk';
+    if (locationLower.includes('canada') || locationLower.includes('ca')) return 'canada';
+    if (locationLower.includes('australia') || locationLower.includes('au')) return 'australia';
+    return '';
+  };
+
   useEffect(() => {
     if (currentWorkspace && !isNewWorkspace) {
+      // Editing existing workspace
       setName(currentWorkspace.name);
       setDomain(currentWorkspace.domain);
       setIpAddress(currentWorkspace.ipAddress);
       setModels(currentWorkspace.models);
       setIsEditing(true);
-    } else {
-      setName("");
-      setDomain("");
-      setIpAddress("");
+      setIsEditMode(false);
+    } else if (isNewWorkspace) {
+      // Creating new workspace - prefill with brand data if available and enable edit mode
+      if (brand && !brandLoading) {
+        setName(brand.name || "");
+        setDomain(brand.website || brand.domain || "");
+        setIpAddress(mapLocationToIpAddress(brand.location || brand.country || ""));
+      } else {
+        setName("");
+        setDomain("");
+        setIpAddress("");
+      }
       setModels({
         chatgpt: true,
         gpt4oSearch: false,
@@ -68,8 +104,27 @@ const WorkspacePage = () => {
         claudeSonnet4: false,
       });
       setIsEditing(false);
+      setIsEditMode(true); // Enable edit mode for new workspace
+    } else {
+      // Just showing brand data (not creating new, no existing workspace) - show as read-only
+      if (brand && !brandLoading) {
+        setName(brand.name || "");
+        setDomain(brand.website || brand.domain || "");
+        setIpAddress(mapLocationToIpAddress(brand.location || brand.country || ""));
+      }
+      setModels({
+        chatgpt: true,
+        gpt4oSearch: false,
+        perplexity: true,
+        aiOverview: true,
+        aiMode: false,
+        gemini: false,
+        claudeSonnet4: false,
+      });
+      setIsEditing(false);
+      setIsEditMode(false); // Disable edit mode initially, user must click Edit button
     }
-  }, [currentWorkspace, isNewWorkspace]);
+  }, [currentWorkspace, isNewWorkspace, brand, brandLoading]);
 
   useEffect(() => {
     if (isLocked) {
@@ -84,7 +139,7 @@ const WorkspacePage = () => {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       toast({
         title: "Error",
@@ -107,18 +162,89 @@ const WorkspacePage = () => {
         title: "Workspace Updated",
         description: `${name} has been updated successfully.`,
       });
+      setIsEditMode(false); // Exit edit mode after saving
     } else {
-      addWorkspace(workspaceData);
-      toast({
-        title: "Workspace Created",
-        description: `${name} has been created successfully.`,
-      });
-      setIsEditing(true);
+      // When creating/updating workspace, also update the brand
+      setIsUpdatingBrand(true);
+      try {
+        const brandUpdateData = {
+          brand_name: name,
+          domain: domain,
+          country: ipAddress,
+        };
+
+        const response = await apiCall("/user/brand", {
+          method: "POST",
+          body: JSON.stringify(brandUpdateData),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to update brand");
+        }
+
+        addWorkspace(workspaceData);
+        
+        toast({
+          title: "Workspace Created",
+          description: `${name} has been created and brand updated successfully.`,
+        });
+
+        // Refetch brand data to update the UI (including WorkspaceDropdown)
+        setTimeout(() => {
+          refetchBrand();
+        }, 500);
+
+        setIsEditing(true);
+        setIsEditMode(false); // Exit edit mode after creating
+      } catch (error) {
+        console.error("Error updating brand:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update brand. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsUpdatingBrand(false);
+      }
     }
   };
 
   const handleGenerateExport = () => {
     console.log("Generating chat history export...");
+  };
+
+  const handleConfirmEdit = async () => {
+    setShowEditWarning(false);
+    
+    // Clear all dashboard data first
+    setIsUpdatingBrand(true);
+    try {
+      // Clear prompts
+      await apiCall("/prompts", { method: "DELETE" }).catch(() => {});
+      
+      // Clear competitors
+      await apiCall("/competitors", { method: "DELETE" }).catch(() => {});
+      
+      // Clear sources
+      await apiCall("/sources", { method: "DELETE" }).catch(() => {});
+      
+      // Clear tags
+      await apiCall("/tags", { method: "DELETE" }).catch(() => {});
+
+      console.log("✅ All dashboard data cleared");
+      
+      toast({
+        title: "Dashboard Cleared",
+        description: "All dashboard data has been cleared. You can now edit the workspace.",
+      });
+    } catch (error) {
+      console.error("Error clearing dashboard data:", error);
+    } finally {
+      setIsUpdatingBrand(false);
+    }
+
+    // Enable edit mode so user can make changes
+    setIsEditMode(true);
   };
 
   return (
@@ -130,9 +256,45 @@ const WorkspacePage = () => {
 
       <Card className="border-border/40">
         <CardHeader className="pb-4">
-          <CardTitle className="text-base font-semibold">
-            {isEditing && !isNewWorkspace ? "Edit Workspace" : "Create New Workspace"}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base font-semibold">
+                {isEditing && !isNewWorkspace ? "Workspace Details" : "Create New Workspace"}
+              </CardTitle>
+            </div>
+            {/* Show edit button when not creating a new workspace and has data (workspace or brand) */}
+            {!isNewWorkspace && (brand || currentWorkspace) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (isEditMode) {
+                    // Cancel - revert changes
+                    if (currentWorkspace) {
+                      setName(currentWorkspace.name);
+                      setDomain(currentWorkspace.domain);
+                      setIpAddress(currentWorkspace.ipAddress);
+                      setModels(currentWorkspace.models);
+                    } else if (brand) {
+                      // Revert to brand data
+                      setName(brand.name || "");
+                      setDomain(brand.website || brand.domain || "");
+                      setIpAddress(mapLocationToIpAddress(brand.location || brand.country || ""));
+                    }
+                    setIsEditMode(false);
+                  } else {
+                    // Show warning dialog before enabling edit mode
+                    setShowEditWarning(true);
+                  }
+                }}
+                className="gap-2"
+                disabled={isUpdatingBrand}
+              >
+                <Edit2 className="w-4 h-4" />
+                {isEditMode ? "Cancel" : isUpdatingBrand ? "Updating..." : "Edit"}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
@@ -144,6 +306,7 @@ const WorkspacePage = () => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="max-w-2xl"
+              disabled={!isEditMode}
             />
           </div>
 
@@ -156,6 +319,7 @@ const WorkspacePage = () => {
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
               className="max-w-2xl"
+              disabled={!isEditMode}
             />
           </div>
 
@@ -163,7 +327,11 @@ const WorkspacePage = () => {
             <Label htmlFor="ip-address" className="text-sm font-medium">
               IP Address
             </Label>
-            <Select value={ipAddress} onValueChange={setIpAddress}>
+            <Select 
+              value={ipAddress} 
+              onValueChange={setIpAddress}
+              disabled={!isEditMode}
+            >
               <SelectTrigger id="ip-address" className="max-w-2xl">
                 <SelectValue placeholder="Select country" />
               </SelectTrigger>
@@ -214,6 +382,7 @@ const WorkspacePage = () => {
                 <Switch
                   checked={models.chatgpt}
                   onCheckedChange={() => handleModelToggle("chatgpt")}
+                  disabled={!isEditMode}
                 />
               </div>
 
@@ -226,6 +395,7 @@ const WorkspacePage = () => {
                 <Switch
                   checked={models.gpt4oSearch}
                   onCheckedChange={() => handleModelToggle("gpt4oSearch")}
+                  disabled={!isEditMode}
                 />
               </div>
 
@@ -238,6 +408,7 @@ const WorkspacePage = () => {
                 <Switch
                   checked={models.perplexity}
                   onCheckedChange={() => handleModelToggle("perplexity")}
+                  disabled={!isEditMode}
                 />
               </div>
 
@@ -250,6 +421,7 @@ const WorkspacePage = () => {
                 <Switch
                   checked={models.aiOverview}
                   onCheckedChange={() => handleModelToggle("aiOverview")}
+                  disabled={!isEditMode}
                 />
               </div>
 
@@ -262,6 +434,7 @@ const WorkspacePage = () => {
                 <Switch
                   checked={models.aiMode}
                   onCheckedChange={() => handleModelToggle("aiMode")}
+                  disabled={!isEditMode}
                 />
               </div>
 
@@ -274,6 +447,7 @@ const WorkspacePage = () => {
                 <Switch
                   checked={models.gemini}
                   onCheckedChange={() => handleModelToggle("gemini")}
+                  disabled={!isEditMode}
                 />
               </div>
 
@@ -286,20 +460,24 @@ const WorkspacePage = () => {
                 <Switch
                   checked={models.claudeSonnet4}
                   onCheckedChange={() => handleModelToggle("claudeSonnet4")}
+                  disabled={!isEditMode}
                 />
               </div>
             </div>
           </div>
 
-          <div className="pt-2">
-            <Button
-              onClick={handleSave}
-              className="bg-foreground text-background hover:bg-foreground/90"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Save
-            </Button>
-          </div>
+          {/* Show Save button only when editing or creating new workspace */}
+          {(isEditMode || !isEditing) && (
+            <div className="pt-2">
+              <Button
+                onClick={handleSave}
+                className="bg-foreground text-background hover:bg-foreground/90"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Save
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -358,6 +536,41 @@ const WorkspacePage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Warning Dialog */}
+      <AlertDialog open={showEditWarning} onOpenChange={setShowEditWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-semibold">Warning: Data Will Be Cleared</AlertDialogTitle>
+            <AlertDialogDescription className="text-base space-y-3 pt-2">
+              <p className="font-medium text-foreground">
+                Editing the workspace will permanently delete all data from your dashboard, including:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-muted-foreground pl-2">
+                <li>All prompts and their rankings</li>
+                <li>Competitor data and analysis</li>
+                <li>Sources and references</li>
+                <li>Tags and categories</li>
+                <li>All other dashboard data</li>
+              </ul>
+              <p className="text-destructive font-medium pt-2">
+                This action cannot be undone. Are you sure you want to continue?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowEditWarning(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmEdit}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Yes, Clear All Data & Edit
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

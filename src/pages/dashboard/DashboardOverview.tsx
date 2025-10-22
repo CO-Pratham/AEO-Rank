@@ -87,8 +87,9 @@ const DashboardOverview = () => {
 
   const fetchVisibilityData = async () => {
     try {
+      console.log("🔄 Dashboard: Fetching visibility data...");
       const token = localStorage.getItem("accessToken");
-      
+
       // Fetch from both endpoints to ensure we get all competitors
       const [analysisResponse, userCompetitorsResponse] = await Promise.all([
         fetch("https://aeotest-production.up.railway.app/analyse/brand/get", {
@@ -97,7 +98,8 @@ const DashboardOverview = () => {
             "Content-Type": "application/json",
           },
         }),
-        fetch("https://aeotest-production.up.railway.app/user/competitor", {
+        fetch("https://aeotest-production.up.railway.app/user/getcompetitor", {
+          method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
@@ -105,185 +107,222 @@ const DashboardOverview = () => {
         }),
       ]);
 
+      console.log("✅ API calls completed");
+      console.log("Analysis Response Status:", analysisResponse.status);
+      console.log("User Competitors Response Status:", userCompetitorsResponse.status);
+
       const data = analysisResponse.ok ? await analysisResponse.json() : [];
-      const userCompetitors = userCompetitorsResponse.ok ? await userCompetitorsResponse.json() : [];
-      
-      console.log("Analysis API Response:", data);
-      console.log("User Competitors Response:", userCompetitors);
-      console.log("Data length:", data?.length);
-      console.log("Sample data item:", data?.[0]);
-  
-        if (Array.isArray(data) && data.length > 0) {
-          // Create a set of unique dates from API
-          const uniqueDates = Array.from(
-            new Set(data.map((item: any) => item.date || item.timestamp || new Date().toISOString().split("T")[0]))
-          ).sort();
-  
-          // Get all unique brands first to ensure we include all brands in the chart
-          const allBrands = Array.from(new Set(data.map((item: any) => item.brand_name).filter(Boolean)));
-          
-          console.log("Unique dates:", uniqueDates);
-          console.log("All brands:", allBrands);
-          
-          // Build chart data: one object per date
-          const chartData = uniqueDates.map((date) => {
-            const dayData: Record<string, string | number> = { date };
-            
-            // Initialize all brands with 0 for this date
-            allBrands.forEach(brand => {
-              dayData[brand] = 0;
-            });
-            
-            // Then populate with actual data
+      const userCompetitorsRaw = userCompetitorsResponse.ok
+        ? await userCompetitorsResponse.json()
+        : [];
+
+      console.log("📊 Analysis API Response:", data);
+      console.log("👥 User Competitors Raw Response:", userCompetitorsRaw);
+      console.log("👥 Number of competitors from API:", Array.isArray(userCompetitorsRaw) ? userCompetitorsRaw.length : 'not an array');
+
+      // Handle different response formats for user competitors
+      let userCompetitors = [];
+      if (Array.isArray(userCompetitorsRaw)) {
+        userCompetitors = userCompetitorsRaw;
+      } else if (userCompetitorsRaw && userCompetitorsRaw.competitors && Array.isArray(userCompetitorsRaw.competitors)) {
+        userCompetitors = userCompetitorsRaw.competitors;
+      } else if (userCompetitorsRaw && userCompetitorsRaw.data && Array.isArray(userCompetitorsRaw.data)) {
+        userCompetitors = userCompetitorsRaw.data;
+      }
+
+      console.log("👥 Processed User Competitors Array:", userCompetitors);
+      console.log("👥 Number of processed competitors:", userCompetitors.length);
+
+      // Always process if we have either analysis data OR user competitors
+      if (
+        (Array.isArray(data) && data.length > 0) ||
+        (Array.isArray(userCompetitors) && userCompetitors.length > 0)
+      ) {
+        console.log("✅ Processing competitor data...");
+        console.log("Analysis data count:", data.length);
+        console.log("User competitors count:", userCompetitors.length);
+        // Create a set of unique dates from API, or use today if no data
+        const uniqueDates =
+          Array.isArray(data) && data.length > 0
+            ? Array.from(
+                new Set(
+                  data.map(
+                    (item: any) =>
+                      item.date ||
+                      item.timestamp ||
+                      new Date().toISOString().split("T")[0]
+                  )
+                )
+              ).sort()
+            : [new Date().toISOString().split("T")[0]];
+
+        // Get all unique brands from both analysis data AND user competitors
+        const brandsFromAnalysis =
+          Array.isArray(data) && data.length > 0
+            ? data.map((item: any) => item.brand_name).filter(Boolean)
+            : [];
+        const brandsFromUserCompetitors =
+          Array.isArray(userCompetitors) && userCompetitors.length > 0
+            ? userCompetitors
+                .map((comp: any) => comp.brand_name || comp.name || comp.brand)
+                .filter(Boolean)
+            : [];
+        const allBrands = Array.from(
+          new Set([...brandsFromAnalysis, ...brandsFromUserCompetitors])
+        );
+
+        console.log("Unique dates:", uniqueDates);
+        console.log("All brands:", allBrands);
+
+        // Build chart data: one object per date
+        const chartData = uniqueDates.map((date) => {
+          const dayData: Record<string, string | number> = { date };
+
+          // Initialize all brands with 0 for this date
+          allBrands.forEach((brand) => {
+            dayData[brand] = 0;
+          });
+
+          // Then populate with actual data (if any)
+          if (Array.isArray(data) && data.length > 0) {
             data.forEach((brand) => {
-              const brandDate = brand.date || brand.timestamp || new Date().toISOString().split("T")[0];
+              const brandDate =
+                brand.date ||
+                brand.timestamp ||
+                new Date().toISOString().split("T")[0];
               if (brandDate === date && brand.brand_name) {
-                const value = Number(brand.avg_visibility) || Number(brand.visibility) || 0;
-                console.log(`Brand: ${brand.brand_name}, Date: ${date}, Value: ${value}`);
-                if (value > 0) {
-                  dayData[brand.brand_name] = Math.round(Math.min(100, Math.max(0, value)));
-                }
+                const value =
+                  Number(brand.avg_visibility) || Number(brand.visibility) || 0;
+                dayData[brand.brand_name] = Math.round(
+                  Math.min(100, Math.max(0, value))
+                );
               }
             });
-            return dayData;
-          });
-  
-          console.log("Setting visibility data with chart data:", chartData);
-          setVisibilityData(chartData);
-          
-          // Debug logging
-          console.log("Chart data:", chartData);
-          console.log("All brands:", allBrands);
-  
-          // Build competitor data with proper ranking
-          // First, create a map of analysis data by brand name
-          const analysisMap = new Map();
+          }
+          return dayData;
+        });
+
+        setVisibilityData(chartData);
+
+        // Build competitor data with proper ranking
+        // First, create a map of analysis data by brand name
+        const analysisMap = new Map();
+        if (Array.isArray(data) && data.length > 0) {
           data.forEach((item: any) => {
             const brandName = item.brand_name || item.brand || item.name;
             if (brandName) {
               analysisMap.set(brandName.toLowerCase(), item);
             }
           });
+        }
 
-          // Merge user competitors with analysis data
-          const allCompetitorsForDisplay = new Map();
-          
-          // Add user competitors first (these are guaranteed to be tracked)
-          if (Array.isArray(userCompetitors) && userCompetitors.length > 0) {
-            userCompetitors.forEach((userComp: any) => {
-              const brandName = userComp.brand_name || userComp.name || userComp.brand;
-              if (brandName) {
-                const analysisItem = analysisMap.get(brandName.toLowerCase());
-                const domain = userComp.domain || userComp.website || `${brandName.toLowerCase().replace(/\s+/g, '')}.com`;
-                
-                allCompetitorsForDisplay.set(brandName.toLowerCase(), {
-                  brand_name: brandName,
-                  domain: domain,
-                  logo: userComp.logo || analysisItem?.logo,
-                  avg_visibility: analysisItem?.avg_visibility || 0,
-                  avg_sentiment: analysisItem?.avg_sentiment,
-                  avg_position: analysisItem?.avg_position,
-                  isUserCompetitor: true,
-                });
-              }
-            });
-          }
+        // Merge user competitors with analysis data
+        const allCompetitorsForDisplay = new Map();
 
-          // Add analysis data for competitors not in user list
+        // Add user competitors first (these are guaranteed to be tracked)
+        if (Array.isArray(userCompetitors) && userCompetitors.length > 0) {
+          userCompetitors.forEach((userComp: any) => {
+            const brandName =
+              userComp.brand_name || userComp.name || userComp.brand;
+            if (brandName) {
+              const analysisItem = analysisMap.get(brandName.toLowerCase());
+              const domain =
+                userComp.domain ||
+                userComp.website ||
+                `${brandName.toLowerCase().replace(/\s+/g, "")}.com`;
+
+              allCompetitorsForDisplay.set(brandName.toLowerCase(), {
+                brand_name: brandName,
+                domain: domain,
+                logo: userComp.logo || analysisItem?.logo,
+                avg_visibility: analysisItem?.avg_visibility || 0,
+                avg_sentiment: analysisItem?.avg_sentiment,
+                avg_position: analysisItem?.avg_position,
+                isUserCompetitor: true,
+              });
+            }
+          });
+        }
+
+        // Add analysis data for competitors not in user list (if any)
+        if (Array.isArray(data) && data.length > 0) {
           data.forEach((item: any) => {
             const brandName = item.brand_name || item.brand || item.name;
-            if (brandName && !allCompetitorsForDisplay.has(brandName.toLowerCase())) {
+            if (
+              brandName &&
+              !allCompetitorsForDisplay.has(brandName.toLowerCase())
+            ) {
               allCompetitorsForDisplay.set(brandName.toLowerCase(), {
                 ...item,
                 isUserCompetitor: false,
               });
             }
           });
+        }
 
-          // Convert to array and sort
-          const competitorData = Array.from(allCompetitorsForDisplay.values())
-            .sort((a, b) => {
-              // Primary sort: visibility (descending)
-              const visibilityA = Number(a.avg_visibility) || 0;
-              const visibilityB = Number(b.avg_visibility) || 0;
-              if (visibilityB !== visibilityA) {
-                return visibilityB - visibilityA;
-              }
-              
-              // Secondary sort: position (ascending) - lower decimal position = better rank
-              const positionA = Number(a.avg_position) || 999;
-              const positionB = Number(b.avg_position) || 999;
-              if (positionA !== positionB) {
-                return positionA - positionB;
-              }
-              
-              // Tertiary sort: sentiment (descending)
-              const sentimentA = Number(a.avg_sentiment) || 0;
-              const sentimentB = Number(b.avg_sentiment) || 0;
-              return sentimentB - sentimentA;
-            })
-            .map((item, index) => {
-              // Get the domain for logo fetching
-              let domain = item.domain || `${item.brand_name.toLowerCase().replace(/\s+/g, '')}.com`;
-              if (domain) {
-                domain = domain
-                  .replace(/^https?:\/\//i, '')
-                  .replace(/^www\./i, '')
-                  .replace(/\/.*$/, '');
-              }
-              
-              return {
-                id: index + 1,
-                brand: item.brand_name,
-                logo: getDomainLogo(domain, item.logo),
-                visibility: `${Math.round(Number(item.avg_visibility) || 0)}%`,
-                sentiment: Number.isFinite(Number(item.avg_sentiment))
-                  ? Math.round(Number(item.avg_sentiment))
-                  : undefined, // Show no sentiment for newly added competitors
-                position: `#${index + 1}`, // Sequential position after proper sorting
-                color: `hsl(${(index * 60) % 360}, 70%, 50%)`, // dynamic color per brand
-                isUserCompetitor: item.isUserCompetitor,
-              };
-            });
-  
-          setCompetitorVisibilityData(competitorData);
-        } else if (Array.isArray(userCompetitors) && userCompetitors.length > 0) {
-          // No analysis data, but we have user competitors - show them with 0% visibility
-          const competitorData = userCompetitors.map((userComp: any, index: number) => {
-            const brandName = userComp.brand_name || userComp.name || userComp.brand;
-            let domain = userComp.domain || userComp.website || `${brandName.toLowerCase().replace(/\s+/g, '')}.com`;
+        // Convert to array and sort
+        const competitorData = Array.from(allCompetitorsForDisplay.values())
+          .sort((a, b) => {
+            // Primary sort: visibility (descending)
+            const visibilityA = Number(a.avg_visibility) || 0;
+            const visibilityB = Number(b.avg_visibility) || 0;
+            if (visibilityB !== visibilityA) {
+              return visibilityB - visibilityA;
+            }
+
+            // Secondary sort: position (ascending) - lower decimal position = better rank
+            const positionA = Number(a.avg_position) || 999;
+            const positionB = Number(b.avg_position) || 999;
+            if (positionA !== positionB) {
+              return positionA - positionB;
+            }
+
+            // Tertiary sort: sentiment (descending)
+            const sentimentA = Number(a.avg_sentiment) || 0;
+            const sentimentB = Number(b.avg_sentiment) || 0;
+            return sentimentB - sentimentA;
+          })
+          .map((item, index) => {
+            // Get the domain for logo fetching
+            let domain =
+              item.domain ||
+              `${item.brand_name.toLowerCase().replace(/\s+/g, "")}.com`;
             if (domain) {
               domain = domain
-                .replace(/^https?:\/\//i, '')
-                .replace(/^www\./i, '')
-                .replace(/\/.*$/, '');
+                .replace(/^https?:\/\//i, "")
+                .replace(/^www\./i, "")
+                .replace(/\/.*$/, "");
             }
-            
+
             return {
               id: index + 1,
-              brand: brandName,
-              logo: getDomainLogo(domain, userComp.logo),
-              visibility: "0%",
-              sentiment: undefined,
+              brand: item.brand_name,
+              logo: getDomainLogo(domain, item.logo),
+              visibility: `${Math.round(Number(item.avg_visibility) || 0)}%`,
+              sentiment: Number.isFinite(Number(item.avg_sentiment))
+                ? Math.round(Number(item.avg_sentiment))
+                : undefined,
               position: `#${index + 1}`,
               color: `hsl(${(index * 60) % 360}, 70%, 50%)`,
-              isUserCompetitor: true,
+              isUserCompetitor: item.isUserCompetitor,
             };
           });
-          
-          setVisibilityData([]);
-          setCompetitorVisibilityData(competitorData);
-        } else {
+
+        console.log("📈 Final competitor data for dashboard:", competitorData);
+        console.log("📈 Total competitors to display:", competitorData.length);
+        setCompetitorVisibilityData(competitorData);
+      } else {
+        console.log("⚠️ No data to display - clearing competitors");
         setVisibilityData([]);
         setCompetitorVisibilityData([]);
       }
     } catch (err) {
-      console.error("Error fetching visibility data:", err);
+      console.error("❌ Error fetching visibility data:", err);
       setVisibilityData([]);
       setCompetitorVisibilityData([]);
     }
   };
-  
+
   useEffect(() => {
     fetchVisibilityData();
   }, [timeRange, selectedModel]);
@@ -291,17 +330,22 @@ const DashboardOverview = () => {
   // Listen for competitor updates and refresh data
   useEffect(() => {
     const handleCompetitorUpdate = () => {
-      console.log("Competitor updated, refreshing visibility data...");
-      fetchVisibilityData();
+      console.log("🔔 Competitor update event received!");
+      console.log("⏰ Waiting 1 second for backend to process...");
+      // Delay to ensure backend has processed the change
+      setTimeout(() => {
+        console.log("⏰ Delay complete, fetching fresh data from backend...");
+        fetchVisibilityData();
+      }, 1000);
     };
 
-    window.addEventListener('competitor-updated', handleCompetitorUpdate);
+    window.addEventListener("competitor-updated", handleCompetitorUpdate);
 
     return () => {
-      window.removeEventListener('competitor-updated', handleCompetitorUpdate);
+      window.removeEventListener("competitor-updated", handleCompetitorUpdate);
     };
-  }, [timeRange, selectedModel]);
-  
+  }, []);
+
   useEffect(() => {
     const fetchRecentChats = async () => {
       try {
@@ -321,7 +365,6 @@ const DashboardOverview = () => {
         }
 
         const data = await response.json();
-        console.log("Recent Chats API Response:", data);
         setRecentChats(Array.isArray(data) ? data.slice(0, 5) : []);
       } catch (err) {
         console.error("Error fetching recent chats:", err);
@@ -344,7 +387,8 @@ const DashboardOverview = () => {
 
   // Use competitors from Redux store
   const competitorsData = competitors.map((comp: any) => {
-    const domain = comp.domain || `${comp.name.toLowerCase().replace(/\s+/g, '')}.com`;
+    const domain =
+      comp.domain || `${comp.name.toLowerCase().replace(/\s+/g, "")}.com`;
     return {
       id: comp.id,
       brand: comp.name,
@@ -497,8 +541,18 @@ const DashboardOverview = () => {
                           dataKey={competitor.brand}
                           stroke={color}
                           strokeWidth={2}
-                          dot={{ r: 4, fill: color, strokeWidth: 2, stroke: color }}
-                          activeDot={{ r: 6, fill: color, strokeWidth: 2, stroke: "#fff" }}
+                          dot={{
+                            r: 4,
+                            fill: color,
+                            strokeWidth: 2,
+                            stroke: color,
+                          }}
+                          activeDot={{
+                            r: 6,
+                            fill: color,
+                            strokeWidth: 2,
+                            stroke: "#fff",
+                          }}
                           connectNulls={false}
                         />
                       );
@@ -506,7 +560,7 @@ const DashboardOverview = () => {
                   : null}
               </LineChart>
             </ResponsiveContainer>
-            
+
             {/* Legend with colored dots */}
             {competitorVisibilityData.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-4 justify-center">
@@ -520,9 +574,12 @@ const DashboardOverview = () => {
                   ];
                   const color = colors[index % colors.length];
                   return (
-                    <div key={competitor.brand} className="flex items-center gap-2">
-                      <div 
-                        className="w-3 h-3 rounded-full" 
+                    <div
+                      key={competitor.brand}
+                      className="flex items-center gap-2"
+                    >
+                      <div
+                        className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: color }}
                       />
                       <span className="text-xs text-muted-foreground font-medium">
@@ -562,142 +619,121 @@ const DashboardOverview = () => {
             </div>
           </CardHeader>
           <CardContent className="px-0 pb-0">
-            <div className="border rounded-lg overflow-hidden h-64">
-              {/* Keep width/height stable; only show scrollbar when > 6 real competitors */}
-              <div
-                className="h-full"
-                style={{
-                  overflowY: (() => {
-                    const merged: any[] = [...competitorsData];
-                    competitorVisibilityData.forEach((apiComp) => {
-                      if (!merged.find((c) => c.brand === apiComp.brand)) {
-                        merged.push(apiComp);
-                      }
-                    });
-                    return merged.length > 6 ? "auto" : "hidden";
-                  })(),
-                }}
-              >
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent border-b bg-muted/30">
-                    <TableHead className="text-xs font-medium text-muted-foreground w-10 pl-6 border-r">
-                      #
-                    </TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground border-r">
-                      Brand
-                    </TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground text-right pr-4 border-r">
-                      Visibility
-                    </TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground text-right pr-4 border-r">
-                      Sentiment
-                    </TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground text-right pr-6">
-                      Position
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(() => {
-                    // Merge API data with Redux data - prioritize Redux for newly added competitors
-                    const mergedCompetitors: any[] = [...competitorsData];
-
-                    // Add API competitors that aren't already in Redux
-                    competitorVisibilityData.forEach(apiComp => {
-                      if (!mergedCompetitors.find(c => c.brand === apiComp.brand)) {
-                        mergedCompetitors.push(apiComp);
-                      }
-                    });
-
-                    // Ensure at least 6 visible rows by padding placeholders
-                    const MIN_ROWS = 6;
-                    const rows: any[] = [...mergedCompetitors];
-                    if (rows.length < MIN_ROWS) {
-                      for (let i = rows.length; i < MIN_ROWS; i += 1) {
-                        rows.push({
-                          id: `placeholder-${i}`,
-                          brand: "—",
-                          logo: "",
-                          visibility: "—",
-                          sentiment: undefined,
-                          position: "—",
-                          _placeholder: true,
-                        });
-                      }
-                    }
-
-                    return rows.slice(0, Math.max(MIN_ROWS, mergedCompetitors.length));
-                  })()
-                    .map((competitor, index) => {
-                      const isOurBrand = competitor.brand === brand?.name;
-                      return (
-                        <TableRow
-                          key={competitor.id || index}
-                          className={`hover:bg-muted/50 border-b last:border-0 ${
-                            isOurBrand
-                              ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/50 dark:border-blue-800/30"
-                              : ""
-                          }`}
-                        >
-                          <TableCell className="text-xs text-muted-foreground pl-6 py-3 border-r">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell className="py-3 border-r">
-                            <div className="flex items-center gap-2.5">
-                              <Avatar className="w-6 h-6">
-                                <AvatarImage
-                                  src={competitor.logo}
-                                  alt={competitor.brand}
-                                />
-                                <AvatarFallback
-                                  className={`text-xs font-semibold ${
+            {competitorVisibilityData.length > 0 ? (
+              <div className="border rounded-lg overflow-hidden h-auto max-h-96">
+                {/* Show scrollbar when content overflows */}
+                <div className="h-full overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent border-b bg-muted/30">
+                        <TableHead className="text-xs font-medium text-muted-foreground w-10 pl-6 border-r">
+                          #
+                        </TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground border-r">
+                          Brand
+                        </TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground text-right pr-4 border-r">
+                          Visibility
+                        </TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground text-right pr-4 border-r">
+                          Sentiment
+                        </TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground text-right pr-6">
+                          Position
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {competitorVisibilityData.map((competitor, index) => {
+                        const isOurBrand = competitor.brand === brand?.name;
+                        return (
+                          <TableRow
+                            key={competitor.id || index}
+                            className={`hover:bg-muted/50 border-b last:border-0 ${
+                              isOurBrand
+                                ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/50 dark:border-blue-800/30"
+                                : ""
+                            }`}
+                          >
+                            <TableCell className="text-xs text-muted-foreground pl-6 py-3 border-r">
+                              {index + 1}
+                            </TableCell>
+                            <TableCell className="py-3 border-r">
+                              <div className="flex items-center gap-2.5">
+                                <Avatar className="w-6 h-6">
+                                  <AvatarImage
+                                    src={competitor.logo}
+                                    alt={competitor.brand}
+                                  />
+                                  <AvatarFallback
+                                    className={`text-xs font-semibold ${
+                                      isOurBrand
+                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
+                                        : "bg-primary/10 text-primary"
+                                    }`}
+                                  >
+                                    {competitor.brand?.charAt(0) || "C"}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span
+                                  className={`text-sm font-medium ${
                                     isOurBrand
-                                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
-                                      : "bg-primary/10 text-primary"
+                                      ? "text-blue-700 dark:text-blue-300"
+                                      : ""
                                   }`}
                                 >
-                                  {competitor.brand?.charAt(0) || "C"}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span
-                                className={`text-sm font-medium ${
-                                  isOurBrand
-                                    ? "text-blue-700 dark:text-blue-300"
-                                    : ""
-                                }`}
-                              >
-                                {competitor.brand}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right text-sm font-semibold pr-4 py-3 border-r">
-                            {competitor.visibility}
-                          </TableCell>
-                          <TableCell className="text-right pr-4 py-3 border-r">
-                            {typeof competitor.sentiment === "number" ? (
-                              <div className="flex items-center justify-end gap-1">
-                                <div className="w-0.5 h-3.5 bg-green-500 rounded"></div>
-                                <span className="text-sm font-medium text-green-600">
-                                  {competitor.sentiment}
+                                  {competitor.brand}
                                 </span>
                               </div>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">
-                                —
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right text-sm font-medium pr-6 py-3">
-                            {competitor.position}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                </TableBody>
-              </Table>
+                            </TableCell>
+                            <TableCell className="text-right text-sm font-semibold pr-4 py-3 border-r">
+                              {competitor.visibility}
+                            </TableCell>
+                            <TableCell className="text-right pr-4 py-3 border-r">
+                              {typeof competitor.sentiment === "number" ? (
+                                <div className="flex items-center justify-end gap-1">
+                                  <div className="w-0.5 h-3.5 bg-green-500 rounded"></div>
+                                  <span className="text-sm font-medium text-green-600">
+                                    {competitor.sentiment}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">
+                                  —
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right text-sm font-medium pr-6 py-3">
+                              {competitor.position}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 px-6 text-center border rounded-lg bg-muted/20">
+                <div className="w-12 h-12 bg-muted/50 rounded-xl flex items-center justify-center mb-3">
+                  <Users className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground font-medium">
+                  No competitors data available
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Add competitors to track their visibility
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => navigate("/dashboard/competitors")}
+                >
+                  Add Competitors
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -876,13 +912,14 @@ const DashboardOverview = () => {
                               className="w-4 h-4 rounded-sm"
                               onError={(e) => {
                                 e.currentTarget.style.display = "none";
-                                const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                                const fallback = e.currentTarget
+                                  .nextElementSibling as HTMLElement | null;
                                 if (fallback) fallback.style.display = "flex";
                               }}
                             />
-                            <span 
+                            <span
                               className="text-xs font-semibold text-muted-foreground hidden"
-                              style={{ display: 'none' }}
+                              style={{ display: "none" }}
                             >
                               {source.domain?.charAt(0).toUpperCase() || "D"}
                             </span>
@@ -1007,157 +1044,65 @@ const DashboardOverview = () => {
                 <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
                   <MessageSquare className="w-5 h-5 text-primary" />
                 </div>
-                <div>
-                  <div className="font-semibold">Chat Details</div>
-                  <DialogDescription className="text-xs mt-1">
-                    Full conversation and analysis
-                  </DialogDescription>
-                </div>
+                Chat Details
               </DialogTitle>
             </DialogHeader>
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            {selectedChat && (
+          <div className="flex-1 overflow-y-auto p-6">
+            {selectedChat ? (
               <div className="space-y-6">
-                {/* Prompt Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <h4 className="text-sm font-semibold text-foreground">
-                      User Prompt
-                    </h4>
-                  </div>
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/20 dark:to-blue-900/10 rounded-xl border border-blue-200/50 dark:border-blue-800/30">
-                    <p className="text-sm leading-relaxed text-foreground">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Prompt</h3>
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <p className="text-sm">
                       {selectedChat.prompt ||
                         selectedChat.question ||
-                        selectedChat.title ||
                         "No prompt available"}
                     </p>
                   </div>
                 </div>
 
-                {/* Response Section */}
-                {selectedChat.response && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <h4 className="text-sm font-semibold text-foreground">
-                        AI Response
-                      </h4>
-                    </div>
-                    <div className="p-4 bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/20 dark:to-green-900/10 rounded-xl border border-green-200/50 dark:border-green-800/30">
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
-                        {selectedChat.response}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Metadata Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                    <h4 className="text-sm font-semibold text-foreground">
-                      Chat Information
-                    </h4>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-muted/30 rounded-xl border border-border/40">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                          <span className="text-xs font-bold text-primary">
-                            AI
-                          </span>
-                        </div>
-                        <div>
-                          <h5 className="text-xs font-semibold text-muted-foreground">
-                            Model
-                          </h5>
-                          <p className="text-sm font-medium">
-                            {selectedChat.model || "Unknown"}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-muted/30 rounded-xl border border-border/40">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
-                          <span className="text-xs font-bold text-orange-600 dark:text-orange-400">
-                            📅
-                          </span>
-                        </div>
-                        <div>
-                          <h5 className="text-xs font-semibold text-muted-foreground">
-                            Date & Time
-                          </h5>
-                          <p className="text-sm font-medium">
-                            {selectedChat.timestamp
-                              ? new Date(
-                                  selectedChat.timestamp
-                                ).toLocaleString()
-                              : "Unknown"}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {selectedChat.brand_mentioned && (
-                      <div className="p-4 bg-muted/30 rounded-xl border border-border/40">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-8 h-8 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg flex items-center justify-center">
-                            <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400">
-                              🏷️
-                            </span>
-                          </div>
-                          <div>
-                            <h5 className="text-xs font-semibold text-muted-foreground">
-                              Brand Mentioned
-                            </h5>
-                            <p className="text-sm font-medium">
-                              {selectedChat.brand_mentioned}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedChat.sentiment && (
-                      <div className="p-4 bg-muted/30 rounded-xl border border-border/40">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-8 h-8 bg-pink-100 dark:bg-pink-900/30 rounded-lg flex items-center justify-center">
-                            <span className="text-xs font-bold text-pink-600 dark:text-pink-400">
-                              💭
-                            </span>
-                          </div>
-                          <div>
-                            <h5 className="text-xs font-semibold text-muted-foreground">
-                              Sentiment
-                            </h5>
-                            <p className="text-sm font-medium">
-                              {selectedChat.sentiment}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Response</h3>
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <p className="text-sm whitespace-pre-wrap">
+                      {selectedChat.response ||
+                        selectedChat.answer ||
+                        "No response available"}
+                    </p>
                   </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <p className="text-xs text-muted-foreground">Model</p>
+                    <p className="font-medium">
+                      {selectedChat.model || "Unknown"}
+                    </p>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <p className="text-xs text-muted-foreground">Timestamp</p>
+                    <p className="font-medium">
+                      {selectedChat.timestamp
+                        ? new Date(selectedChat.timestamp).toLocaleString()
+                        : "Unknown"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">No chat selected</p>
               </div>
             )}
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-border/40 bg-muted/20">
+          <div className="px-6 py-4 border-t border-border/40 bg-muted/30">
             <div className="flex justify-end">
-              <Button
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-                className="px-6"
-              >
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Close
               </Button>
             </div>
