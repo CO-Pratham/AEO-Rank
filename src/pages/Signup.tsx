@@ -68,7 +68,7 @@ const Signup = () => {
           },
           body: JSON.stringify({
             email,
-            baseurl: "http://localhost:8080",
+            baseurl: "https://aeo-frontend-main-branch-main.vercel.app",
           }),
         }
       );
