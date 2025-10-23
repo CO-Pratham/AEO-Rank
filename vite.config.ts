@@ -18,4 +18,18 @@ export default defineConfig(({ mode }) => ({
     },
   },
   base: "./",
+  build: {
+    // Increase chunk size warning limit to 1000kb
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split vendor chunks
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'redux-vendor': ['@reduxjs/toolkit', 'react-redux'],
+          'ui-vendor': ['lucide-react', 'recharts'],
+        },
+      },
+    },
+  },
 }));
