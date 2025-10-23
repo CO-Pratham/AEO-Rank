@@ -317,7 +317,15 @@ const WorkspacePage = () => {
             <Input
               id="domain"
               value={domain}
-              onChange={(e) => setDomain(e.target.value)}
+              onChange={(e) => {
+                // Auto-clean the domain - remove http://, https://, and www.
+                let cleanValue = e.target.value.trim();
+                cleanValue = cleanValue.replace(/^https?:\/\//i, '');
+                cleanValue = cleanValue.replace(/^www\./i, '');
+                cleanValue = cleanValue.split('/')[0]; // Remove any path after domain
+                setDomain(cleanValue);
+              }}
+              placeholder="example.com (no http:// or www.)"
               className="max-w-2xl"
               disabled={!isEditMode}
             />

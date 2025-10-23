@@ -56,10 +56,256 @@ import {
   Eye,
   Users,
   Globe,
+  Globe2,
   MessageSquare,
+  User,
+  Bot,
 } from "lucide-react";
 import { LoadingScreen } from "@/components/ui/loading-spinner";
 import { getDomainLogo, generateInitials } from "@/utils/logoUtils";
+
+// Helper function to get country flag emoji
+const getCountryFlag = (location: string): string => {
+  if (!location) return '🇮🇳'; // Default to India
+  
+  const loc = location.toLowerCase();
+  
+  // Map country names to flag emojis
+  if (loc.includes('india') || loc.includes('in')) return '🇮🇳';
+  if (loc.includes('united states') || loc.includes('usa') || loc.includes('us')) return '🇺🇸';
+  if (loc.includes('united kingdom') || loc.includes('uk') || loc.includes('britain') || loc.includes('england')) return '🇬🇧';
+  if (loc.includes('canada') || loc.includes('ca')) return '🇨🇦';
+  if (loc.includes('australia') || loc.includes('au')) return '🇦🇺';
+  if (loc.includes('germany') || loc.includes('de')) return '🇩🇪';
+  if (loc.includes('france') || loc.includes('fr')) return '🇫🇷';
+  if (loc.includes('japan') || loc.includes('jp')) return '🇯🇵';
+  if (loc.includes('china') || loc.includes('cn')) return '🇨🇳';
+  if (loc.includes('brazil') || loc.includes('br')) return '🇧🇷';
+  if (loc.includes('mexico') || loc.includes('mx')) return '🇲🇽';
+  if (loc.includes('spain') || loc.includes('es')) return '🇪🇸';
+  if (loc.includes('italy') || loc.includes('it')) return '🇮🇹';
+  if (loc.includes('russia') || loc.includes('ru')) return '🇷🇺';
+  if (loc.includes('singapore') || loc.includes('sg')) return '🇸🇬';
+  if (loc.includes('netherlands') || loc.includes('nl')) return '🇳🇱';
+  if (loc.includes('sweden') || loc.includes('se')) return '🇸🇪';
+  if (loc.includes('switzerland') || loc.includes('ch')) return '🇨🇭';
+  
+  return '🌐'; // Generic globe for unknown countries
+};
+
+// Helper function to get AI model logo
+const getModelLogo = (chat: any): string => {
+  const modelSources = [
+    chat?.model,
+    chat?.platform,
+    chat?.ai_model,
+    chat?.engine,
+    chat?.model_name,
+    chat?.provider,
+    chat?.source,
+    chat?.type
+  ];
+
+  for (const source of modelSources) {
+    if (source && typeof source === 'string' && source.trim() !== '' && source.toLowerCase() !== 'unknown') {
+      const lowerSource = source.toLowerCase();
+      
+      // Return specific model logos
+      if (lowerSource.includes('gpt') || lowerSource.includes('openai') || lowerSource.includes('chatgpt')) {
+        return 'https://cdn.oaistatic.com/_next/static/media/apple-touch-icon.59f2e898.png';
+      }
+      if (lowerSource.includes('claude') || lowerSource.includes('anthropic')) {
+        return 'https://claude.ai/images/claude_app_icon.png';
+      }
+      if (lowerSource.includes('gemini') || lowerSource.includes('bard') || lowerSource.includes('google')) {
+        return 'https://www.gstatic.com/lamda/images/gemini_favicon_f069958c85030456e93de685481c559f160ea06b.png';
+      }
+      if (lowerSource.includes('perplexity')) {
+        return 'https://www.perplexity.ai/favicon.svg';
+      }
+      if (lowerSource.includes('copilot')) {
+        return 'https://www.bing.com/favicon.ico';
+      }
+    }
+  }
+  
+  // Default AI icon
+  return '';
+};
+
+// Helper function to format model names
+const formatModelName = (chat: any): string => {
+  // Log to debug what we're getting
+  console.log('Chat object for model detection:', chat);
+  
+  const modelSources = [
+    chat?.model,
+    chat?.platform,
+    chat?.ai_model,
+    chat?.engine,
+    chat?.model_name,
+    chat?.provider,
+    chat?.source,
+    chat?.type
+  ];
+
+  console.log('Model sources:', modelSources);
+
+  for (const source of modelSources) {
+    if (source && typeof source === 'string' && source.trim() !== '' && source.toLowerCase() !== 'unknown') {
+      const lowerSource = source.toLowerCase();
+      
+      // Check for specific models
+      if (lowerSource.includes('gpt-4')) return 'GPT-4';
+      if (lowerSource.includes('gpt-3.5') || lowerSource.includes('gpt3.5')) return 'GPT-3.5';
+      if (lowerSource.includes('gpt')) return 'ChatGPT';
+      if (lowerSource.includes('claude-3')) return 'Claude 3';
+      if (lowerSource.includes('claude')) return 'Claude';
+      if (lowerSource.includes('gemini')) return 'Gemini';
+      if (lowerSource.includes('palm')) return 'PaLM';
+      if (lowerSource.includes('llama')) return 'LLaMA';
+      if (lowerSource.includes('mistral')) return 'Mistral';
+      if (lowerSource.includes('perplexity')) return 'Perplexity';
+      if (lowerSource.includes('copilot')) return 'Copilot';
+      if (lowerSource.includes('bard')) return 'Bard';
+      if (lowerSource.includes('openai')) return 'OpenAI';
+      if (lowerSource.includes('anthropic')) return 'Claude';
+      if (lowerSource.includes('google')) return 'Gemini';
+      
+      // Return capitalized version if no match
+      return source.charAt(0).toUpperCase() + source.slice(1);
+    }
+  }
+  
+  return 'AI Overview';
+};
+
+// Helper function to parse markdown to HTML
+const parseMarkdownToHTML = (text: string): string => {
+  if (!text) return '';
+  
+  let html = text;
+  
+  // Escape HTML entities
+  html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  
+  // Parse code blocks (with language support)
+  html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+    return `<pre class="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg overflow-x-auto my-3"><code class="text-xs">${code.trim()}</code></pre>`;
+  });
+  
+  // Parse inline code
+  html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs">$1</code>');
+  
+  // Parse bold
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>');
+  html = html.replace(/__([^_]+)__/g, '<strong class="font-semibold">$1</strong>');
+  
+  // Parse italic
+  html = html.replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>');
+  html = html.replace(/_([^_]+)_/g, '<em class="italic">$1</em>');
+  
+  // Parse headers
+  html = html.replace(/^### (.*?)$/gm, '<h3 class="text-base font-semibold mt-4 mb-2">$1</h3>');
+  html = html.replace(/^## (.*?)$/gm, '<h2 class="text-lg font-semibold mt-4 mb-2">$1</h2>');
+  html = html.replace(/^# (.*?)$/gm, '<h1 class="text-xl font-bold mt-4 mb-2">$1</h1>');
+  
+  // Parse tables
+  const tableRegex = /(\|.+\|\n)+/g;
+  html = html.replace(tableRegex, (match) => {
+    const rows = match.trim().split('\n');
+    if (rows.length < 2) return match;
+    
+    let tableHTML = '<div class="overflow-x-auto my-4"><table class="min-w-full border-collapse border border-gray-300 dark:border-gray-700">';
+    
+    const isSeparator = /^\|[\s:-]+\|/.test(rows[1]);
+    const startDataRow = isSeparator ? 2 : 1;
+    
+    // Header row
+    if (isSeparator && rows[0]) {
+      const headerCells = rows[0].split('|').filter(cell => cell.trim());
+      tableHTML += '<thead class="bg-gray-100 dark:bg-gray-800"><tr>';
+      headerCells.forEach(cell => {
+        tableHTML += `<th class="border border-gray-300 dark:border-gray-700 px-4 py-2 text-left text-sm font-semibold">${cell.trim()}</th>`;
+      });
+      tableHTML += '</tr></thead>';
+    }
+    
+    // Data rows
+    tableHTML += '<tbody>';
+    for (let i = startDataRow; i < rows.length; i++) {
+      const cells = rows[i].split('|').filter(cell => cell.trim());
+      if (cells.length > 0) {
+        tableHTML += '<tr class="hover:bg-gray-50 dark:hover:bg-gray-800">';
+        cells.forEach(cell => {
+          tableHTML += `<td class="border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm">${cell.trim()}</td>`;
+        });
+        tableHTML += '</tr>';
+      }
+    }
+    tableHTML += '</tbody></table></div>';
+    
+    return tableHTML;
+  });
+  
+  // Parse unordered lists
+  html = html.replace(/^[\*\-\+] (.+)$/gm, '<li class="ml-4">$1</li>');
+  html = html.replace(/(<li class="ml-4">.*?<\/li>\n?)+/gs, '<ul class="list-disc list-outside ml-4 my-2 space-y-1">$&</ul>');
+  
+  // Parse ordered lists
+  html = html.replace(/^\d+\. (.+)$/gm, '<li class="ml-4">$1</li>');
+  html = html.replace(/(<li class="ml-4">.*?<\/li>\n?)(?!<\/ul>)+/gs, (match) => {
+    if (match.includes('<ul')) return match;
+    return '<ol class="list-decimal list-outside ml-4 my-2 space-y-1">' + match + '</ol>';
+  });
+  
+  // Parse blockquotes
+  html = html.replace(/^&gt; (.+)$/gm, '<blockquote class="border-l-4 border-gray-300 dark:border-gray-700 pl-4 italic my-2">$1</blockquote>');
+  
+  // Parse line breaks and paragraphs
+  html = html.replace(/\n\n+/g, '</p><p class="my-2">');
+  html = html.replace(/\n/g, '<br/>');
+  
+  // Wrap in paragraph if not already wrapped
+  if (!html.match(/^<(h[1-6]|ul|ol|table|pre|blockquote)/)) {
+    html = '<p class="my-2">' + html + '</p>';
+  }
+  
+  // Clean up
+  html = html.replace(/<p class="my-2"><\/p>/g, '');
+  html = html.replace(/<p class="my-2">\s*<\/p>/g, '');
+  
+  return html;
+};
+
+// Extended color palette for unique brand colors
+const BRAND_COLORS = [
+  "#3b82f6", // blue
+  "#ef4444", // red
+  "#f97316", // orange
+  "#8b5cf6", // purple
+  "#10b981", // green
+  "#ec4899", // pink
+  "#06b6d4", // cyan
+  "#f59e0b", // amber
+  "#6366f1", // indigo
+  "#84cc16", // lime
+  "#14b8a6", // teal
+  "#f43f5e", // rose
+  "#a855f7", // violet
+  "#eab308", // yellow
+  "#22c55e", // emerald
+  "#0ea5e9", // sky
+  "#d946ef", // fuchsia
+  "#fb923c", // orange-400
+  "#4ade80", // green-400
+  "#60a5fa", // blue-400
+  "#c084fc", // purple-400
+  "#fb7185", // rose-400
+  "#34d399", // emerald-400
+  "#fbbf24", // amber-400
+  "#38bdf8", // sky-400
+];
 
 const DashboardOverview = () => {
   const navigate = useNavigate();
@@ -260,8 +506,13 @@ const DashboardOverview = () => {
           });
         }
 
-        // Convert to array and sort
+        // Convert to array, filter out 0% visibility brands, and sort
         const competitorData = Array.from(allCompetitorsForDisplay.values())
+          .filter((item) => {
+            // Only include brands with visibility > 0%
+            const visibility = Number(item.avg_visibility) || 0;
+            return visibility > 0;
+          })
           .sort((a, b) => {
             // Primary sort: visibility (descending)
             const visibilityA = Number(a.avg_visibility) || 0;
@@ -303,7 +554,7 @@ const DashboardOverview = () => {
                 ? Math.round(Number(item.avg_sentiment))
                 : undefined,
               position: `#${index + 1}`,
-              color: `hsl(${(index * 60) % 360}, 70%, 50%)`,
+              color: BRAND_COLORS[index % BRAND_COLORS.length],
               isUserCompetitor: item.isUserCompetitor,
             };
           });
@@ -526,14 +777,7 @@ const DashboardOverview = () => {
                 />
                 {competitorVisibilityData.length > 0
                   ? competitorVisibilityData.map((competitor, index) => {
-                      const colors = [
-                        "#3b82f6",
-                        "#ef4444",
-                        "#f97316",
-                        "#8b5cf6",
-                        "#10b981",
-                      ];
-                      const color = colors[index % colors.length];
+                      const color = BRAND_COLORS[index % BRAND_COLORS.length];
                       return (
                         <Line
                           key={competitor.brand}
@@ -565,21 +809,14 @@ const DashboardOverview = () => {
             {competitorVisibilityData.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-4 justify-center">
                 {competitorVisibilityData.map((competitor, index) => {
-                  const colors = [
-                    "#3b82f6",
-                    "#ef4444",
-                    "#f97316",
-                    "#8b5cf6",
-                    "#10b981",
-                  ];
-                  const color = colors[index % colors.length];
+                  const color = BRAND_COLORS[index % BRAND_COLORS.length];
                   return (
                     <div
                       key={competitor.brand}
                       className="flex items-center gap-2"
                     >
                       <div
-                        className="w-3 h-3 rounded-full"
+                        className="w-3 h-3 rounded-full ring-2 ring-white dark:ring-gray-900"
                         style={{ backgroundColor: color }}
                       />
                       <span className="text-xs text-muted-foreground font-medium">
@@ -962,151 +1199,297 @@ const DashboardOverview = () => {
         </div>
       </div>
 
-      <Card className="border-border/40">
-        <CardHeader className="pb-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-muted-foreground" />
-              <CardTitle className="text-sm font-semibold">
-                Recent Chats
-              </CardTitle>
+      <Card className="border">
+        <CardHeader className="pb-4 border-b">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base font-semibold">Recent Chats</CardTitle>
+              <CardDescription className="text-sm text-muted-foreground mt-1">
+                Chats that mentioned {brand?.name || "your brand"}
+              </CardDescription>
             </div>
-            <CardDescription className="text-xs text-muted-foreground">
-              Chats that mentioned {brand?.name || "your brand"}
-            </CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="pb-4">
+        <CardContent className="p-0">
           {recentChats.length > 0 ? (
-            <div className="space-y-3">
+            <div className="divide-y">
               {recentChats.map((chat, index) => (
                 <div
                   key={index}
-                  className="group flex items-start gap-3 p-4 bg-gradient-to-r from-muted/20 to-muted/30 rounded-xl cursor-pointer hover:from-muted/40 hover:to-muted/50 transition-all duration-200 border border-border/20 hover:border-border/40 hover:shadow-sm"
+                  className="group flex items-start gap-4 p-4 cursor-pointer hover:bg-muted/30 transition-colors"
                   onClick={() => {
                     setSelectedChat(chat);
                     setIsDialogOpen(true);
                   }}
                 >
-                  <div className="w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/20 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:from-primary/20 group-hover:to-primary/30 transition-all duration-200">
-                    <MessageSquare className="w-4 h-4 text-primary" />
+                  {/* Success Indicator */}
+                  <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
+                      <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
                   </div>
+
+                  {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate text-foreground group-hover:text-foreground/90">
-                      {chat.prompt ||
-                        chat.question ||
-                        chat.title ||
-                        "Chat message"}
-                    </p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                        <span className="text-xs text-muted-foreground font-medium">
-                          {chat.model || "AI Model"}
+                    {/* Title/Prompt */}
+                    <h3 className="text-sm font-medium text-foreground mb-3 line-clamp-2">
+                      {chat.prompt || chat.question || chat.query || chat.user_query || chat.title || "Chat message"}
+                    </h3>
+
+                    {/* Meta Info */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {/* AI Model Badge */}
+                      <div className="flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-md">
+                        <MessageSquare className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">
+                          {formatModelName(chat)}
                         </span>
                       </div>
-                      <span className="text-xs text-muted-foreground">•</span>
+
+                      {/* Location Badge if available */}
+                      {(chat.location || chat.country) && (
+                        <div className="flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-md">
+                          <Globe2 className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            {chat.location || chat.country}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Timestamp */}
                       <span className="text-xs text-muted-foreground">
-                        {chat.timestamp
-                          ? new Date(chat.timestamp).toLocaleDateString()
+                        {chat.timestamp || chat.created_at || chat.date || chat.chat_date
+                          ? new Date(chat.timestamp || chat.created_at || chat.date || chat.chat_date).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })
                           : "Recent"}
                       </span>
                     </div>
                   </div>
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+
+                  {/* Arrow Icon */}
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity mt-1">
                     <ArrowRight className="w-4 h-4 text-muted-foreground" />
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-32 text-center">
-              <div className="w-12 h-12 bg-muted/30 rounded-xl flex items-center justify-center mb-3">
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-12 h-12 bg-muted/20 rounded-lg flex items-center justify-center mb-3">
                 <MessageSquare className="w-6 h-6 text-muted-foreground" />
               </div>
-              <p className="text-sm text-muted-foreground font-medium">
-                No recent chats available
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Chats will appear here once available
-              </p>
+              <p className="text-sm text-foreground font-medium">No recent chats available</p>
+              <p className="text-xs text-muted-foreground mt-1">Conversations will appear here once available</p>
             </div>
           )}
         </CardContent>
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-border/40 bg-gradient-to-r from-primary/5 to-primary/10">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-3 text-lg">
-                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                  <MessageSquare className="w-5 h-5 text-primary" />
-                </div>
-                Chat Details
-              </DialogTitle>
-            </DialogHeader>
-          </div>
+        <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+          {selectedChat ? (
+            <>
+              {/* Header with Badges */}
+              <div className="px-6 py-5 border-b bg-white">
+                {/* Badges */}
+                <div className="flex items-center gap-2">
+                  {/* Success Badge */}
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 border border-green-200 rounded-md">
+                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span className="text-xs font-medium text-green-700">Succeeded</span>
+                  </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6">
-            {selectedChat ? (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Prompt</h3>
-                  <div className="bg-muted/30 rounded-lg p-4">
-                    <p className="text-sm">
-                      {selectedChat.prompt ||
-                        selectedChat.question ||
-                        "No prompt available"}
-                    </p>
+                  {/* AI Model Badge */}
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-muted/50 border rounded-md">
+                    {getModelLogo(selectedChat) && (
+                      <img 
+                        src={getModelLogo(selectedChat)} 
+                        alt="AI" 
+                        className="w-3.5 h-3.5 rounded-full"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <span className="text-xs font-medium text-foreground">
+                      {formatModelName(selectedChat)}
+                    </span>
+                  </div>
+
+                  {/* Country Badge */}
+                  {(selectedChat.location || selectedChat.country) && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-muted/50 border rounded-md">
+                      <span className="text-sm">{getCountryFlag(selectedChat.location || selectedChat.country)}</span>
+                      <span className="text-xs font-medium text-foreground">
+                        {selectedChat.location || selectedChat.country || "India"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Two Column Layout: Main Content + Sidebar */}
+              <div className="flex flex-1 overflow-hidden">
+                {/* Main Content - Chat Messages */}
+                <div className="flex-1 overflow-y-auto px-6 py-6 bg-muted/20">
+                  <div className="max-w-4xl mx-auto space-y-6">
+                    {/* User Message - Right Side */}
+                    <div className="flex justify-end">
+                      <div className="flex gap-3 max-w-[85%]">
+                        <div className="flex-1 bg-black text-white rounded-lg p-3.5">
+                          <p className="text-sm leading-relaxed break-words">
+                            {selectedChat.prompt ||
+                              selectedChat.question ||
+                              selectedChat.query ||
+                              selectedChat.user_query ||
+                              "No prompt available"}
+                          </p>
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                          <User className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* AI Response - Left Side */}
+                    <div className="flex justify-start">
+                      <div className="flex gap-3 max-w-[90%]">
+                        <div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center flex-shrink-0">
+                          {getModelLogo(selectedChat) ? (
+                            <img 
+                              src={getModelLogo(selectedChat)} 
+                              alt="AI" 
+                              className="w-4 h-4 rounded-full"
+                              onError={(e) => {
+                                const target = e.currentTarget as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  const botIcon = document.createElement('div');
+                                  botIcon.innerHTML = '<svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>';
+                                  parent.appendChild(botIcon);
+                                }
+                              }}
+                            />
+                          ) : (
+                            <Bot className="w-4 h-4 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="flex-1 bg-white dark:bg-gray-800 border rounded-lg p-4">
+                          <div 
+                            className="text-sm leading-relaxed text-foreground prose prose-sm max-w-none"
+                            dangerouslySetInnerHTML={{
+                              __html: parseMarkdownToHTML(
+                                selectedChat.response ||
+                                selectedChat.answer ||
+                                selectedChat.ai_response ||
+                                "No response available"
+                              )
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Response</h3>
-                  <div className="bg-muted/30 rounded-lg p-4">
-                    <p className="text-sm whitespace-pre-wrap">
-                      {selectedChat.response ||
-                        selectedChat.answer ||
-                        "No response available"}
-                    </p>
-                  </div>
-                </div>
+                {/* Right Sidebar - Brands & Sources */}
+                <div className="w-72 border-l bg-white overflow-y-auto">
+                  <div className="p-4 space-y-5">
+                    {/* Brands Section */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground mb-3">Brands</h3>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                        <span>No brands mentioned</span>
+                      </div>
+                    </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-muted/30 rounded-lg p-4">
-                    <p className="text-xs text-muted-foreground">Model</p>
-                    <p className="font-medium">
-                      {selectedChat.model || "Unknown"}
-                    </p>
-                  </div>
-                  <div className="bg-muted/30 rounded-lg p-4">
-                    <p className="text-xs text-muted-foreground">Timestamp</p>
-                    <p className="font-medium">
-                      {selectedChat.timestamp
-                        ? new Date(selectedChat.timestamp).toLocaleString()
-                        : "Unknown"}
-                    </p>
+                    {/* Sources Section */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground mb-3">Sources</h3>
+                      <div className="space-y-3">
+                        {/* Extract and display sources from response */}
+                        {(() => {
+                          const response = selectedChat.response || selectedChat.answer || selectedChat.ai_response || "";
+                          const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g;
+                          const rawUrls: string[] = response.match(urlRegex) || [];
+                          
+                          // Clean URLs - remove trailing punctuation
+                          const cleanedUrls = rawUrls.map(url => {
+                            // Remove trailing punctuation like ), ., ,, ;, etc.
+                            return url.replace(/[.,;:)\]]+$/, '');
+                          });
+                          
+                          const uniqueUrls: string[] = [...new Set(cleanedUrls)];
+
+                          if (uniqueUrls.length === 0) {
+                            return (
+                              <p className="text-sm text-muted-foreground">No sources found</p>
+                            );
+                          }
+
+                          return uniqueUrls.map((url: string, index: number) => {
+                            try {
+                              const urlObj = new URL(url);
+                              const domain = urlObj.hostname.replace('www.', '');
+                              const title = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
+                              
+                              return (
+                                <a
+                                  key={index}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-start gap-3 p-3 hover:bg-muted/30 rounded-lg border border-transparent hover:border-border transition-colors group"
+                                >
+                                  <div className="w-5 h-5 bg-muted rounded flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <img 
+                                      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                                      alt=""
+                                      className="w-3.5 h-3.5"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="text-xs font-medium text-foreground mb-0.5 truncate group-hover:text-blue-600">
+                                      {title}
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground truncate">
+                                      {domain}
+                                    </p>
+                                  </div>
+                                </a>
+                              );
+                            } catch (e) {
+                              return null;
+                            }
+                          });
+                        })()}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">No chat selected</p>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] p-6">
+              <div className="w-16 h-16 bg-muted/30 rounded-lg flex items-center justify-center mb-4">
+                <MessageSquare className="w-8 h-8 text-muted-foreground" />
               </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="px-6 py-4 border-t border-border/40 bg-muted/30">
-            <div className="flex justify-end">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Close
-              </Button>
+              <p className="text-sm text-muted-foreground">No chat selected</p>
+              <p className="text-xs text-muted-foreground mt-1">Select a chat to view details</p>
             </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

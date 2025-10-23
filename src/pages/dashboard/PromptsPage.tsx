@@ -42,31 +42,55 @@ import {
   FileText,
   Globe2,
   Upload,
+  X,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Loader2,
 } from "lucide-react";
 import { LoadingScreen } from "@/components/ui/loading-spinner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAppDispatch, useAppSelector } from "@/hooks/redux";
+import { useToast } from "@/hooks/use-toast";
 import { incrementTagMentions } from "@/store/slices/tagsSlice";
-
-interface Prompt {
-  id: number;
-  prompt: string;
-  visibility: string;
-  sentiment: string;
-  position: string;
-  mentions: { platform: string; color: string }[];
-  volume: number;
-  volumeValue: number;
-  tags: string[];
-  location: string;
-  suggestedAt?: string;
-  addedAt?: Date;
-}
+import { 
+  fetchActivePrompts,
+  fetchInactivePrompts,
+  createPrompt,
+  updatePromptTags,
+  deactivatePrompts as deactivatePromptsThunk,
+  activatePrompts as activatePromptsThunk,
+  setSelectedPromptIds,
+  setSelectedInactiveIds,
+  deleteInactivePrompts,
+  type Prompt 
+} from "@/store/slices/promptsSlice";
+import { getFaviconUrl } from "@/utils/logoUtils";
+import {
+  PLATFORM_DOMAINS,
+  getDomainForBrand,
+  getCountryFlag,
+  getTimeAgo,
+  sortPromptsByDate,
+  parseCSVLine,
+} from "@/utils/promptUtils";
 
 const PromptsPage = () => {
   const dispatch = useAppDispatch();
-  const availableTags = useAppSelector((state) => state.tags.tags);
   const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  // Redux state
+  const availableTags = useAppSelector((state) => state.tags.tags);
+  const activePrompts = useAppSelector((state) => state.prompts.activePrompts);
+  const inactivePrompts = useAppSelector((state) => state.prompts.inactivePrompts);
+  const suggestedPrompts = useAppSelector((state) => state.prompts.suggestedPrompts);
+  const loading = useAppSelector((state) => state.prompts.loading);
+  const isAddingPrompt = useAppSelector((state) => state.prompts.isAddingPrompt);
+  const selectedPromptIds = useAppSelector((state) => state.prompts.selectedPromptIds);
+  const selectedInactiveIds = useAppSelector((state) => state.prompts.selectedInactiveIds);
+  
+  // Local UI state
   const [searchTerm, setSearchTerm] = useState("");
   const [timeRange, setTimeRange] = useState("7d");
   const [modelFilter, setModelFilter] = useState("all");
@@ -75,341 +99,75 @@ const PromptsPage = () => {
   const [addPromptTab, setAddPromptTab] = useState("single");
   const [selectedCountry, setSelectedCountry] = useState("IN");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [selectedPromptIds, setSelectedPromptIds] = useState<number[]>([]);
-  const [selectedInactiveIds, setSelectedInactiveIds] = useState<number[]>([]);
-  const [activePrompts, setActivePrompts] = useState<Prompt[]>([]);
-  const [inactivePrompts, setInactivePrompts] = useState<Prompt[]>([]);
-  const [suggestedPrompts, setSuggestedPrompts] = useState<Prompt[]>([]);
-  const [loading, setLoading] = useState(false);
   const [suggestingLoading, setSuggestingLoading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [tagDialogOpen, setTagDialogOpen] = useState(false);
+  const [currentPromptForTag, setCurrentPromptForTag] = useState<Prompt | null>(null);
+  const [tagsToAssign, setTagsToAssign] = useState<string[]>([]);
+  const [activeSortOrder, setActiveSortOrder] = useState<"asc" | "desc" | null>(null);
+  const [inactiveSortOrder, setInactiveSortOrder] = useState<"asc" | "desc" | null>(null);
+  const [activeTab, setActiveTab] = useState("active");
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  }>({
+    open: false,
+    title: "",
+    description: "",
+    onConfirm: () => {},
+  });
 
-  // API Functions - Backend developer should replace these endpoints
-  const fetchActivePrompts = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("accessToken");
-
-      const response = await fetch(
-        "https://aeotest-production.up.railway.app/prompt/meta/get",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          mode: "cors",
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch prompts: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("Active Prompts API Response:", data);
-
-      // Process the data to match the expected format
-      const processedPrompts = Array.isArray(data)
-        ? data.map((item) => {
-            // Convert mentions object to array format for UI
-            const mentionsArray =
-              item.mentions && typeof item.mentions === "object"
-                ? Object.entries(item.mentions)
-                    .map(([platform, count]) => {
-                      const platformColors: Record<string, string> = {
-                        ChatGPT: "#10a37f",
-                        Claude: "#cc785c",
-                        Gemini: "#4285f4",
-                        Perplexity: "#1fb6ff",
-                        Freshworks: "#ff6b6b",
-                        Salesforce: "#00a1e0",
-                        Zoho: "#e42527",
-                      };
-
-                      return {
-                        platform,
-                        color: platformColors[platform] || "#6b7280",
-                        count: Number(count) || 0,
-                      };
-                    })
-                    .filter((m) => m.count > 0) // Only show platforms with mentions > 0
-                : [];
-
-            // Process tags - handle null, array, or string
-            const tagsArray = item.tags
-              ? Array.isArray(item.tags)
-                ? item.tags
-                : typeof item.tags === "string"
-                ? item.tags
-                    .split(",")
-                    .map((t) => t.trim())
-                    .filter(Boolean)
-                : []
-              : [];
-
-            // Store actual volume value for display
-            const volumeValue = Number(item.volume) || 0;
-            const volumeBars = Math.min(
-              Math.max(Math.ceil(volumeValue / 100), 0),
-              5
-            );
-
-            return {
-              id: item.id,
-              prompt: item.prompt || "No prompt text",
-              // Backend should provide these fields - using defaults for now
-              visibility:
-                item.visibility !== undefined ? `${item.visibility}%` : "—",
-              sentiment: item.sentiment || "—",
-              position: item.position ? `#${item.position}` : "—",
-              mentions: mentionsArray,
-              volume: volumeBars,
-              volumeValue: volumeValue,
-              tags: tagsArray,
-              addedAt: item.added ? new Date(item.added) : new Date(),
-              location: item.location || "—",
-            };
-          })
-        : [];
-
-      console.log("Processed prompts:", processedPrompts);
-      console.log("Sample processed prompt:", processedPrompts[0]); // Debug first item
-      setActivePrompts(processedPrompts);
-    } catch (error) {
-      console.error("Error fetching active prompts:", error);
-      setActivePrompts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createPrompt = async (promptData: Omit<Prompt, "id">) => {
-    try {
-      const token = localStorage.getItem("accessToken");
-
-      // Optimistically add to UI while we await the backend
-      const optimistic: Prompt = {
-        ...promptData,
-        id: Date.now(),
-      };
-      setActivePrompts((prev) => [optimistic, ...prev]);
-
-      // Map country code to full name if needed
-      const countryCodeToName: Record<string, string> = {
-        IN: "India",
-        US: "United States",
-        GB: "United Kingdom",
-        CA: "Canada",
-        AU: "Australia",
-        DE: "Germany",
-      };
-      const fullCountry =
-        countryCodeToName[(promptData.location as string) || ""] ||
-        (promptData.location as string) ||
-        "";
-
-      // Use the correct endpoint for adding prompts
-      const response = await fetch(
-        "https://aeotest-production.up.railway.app/prompt/add",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          mode: "cors",
-          body: JSON.stringify({
-            prompt: promptData.prompt,
-            tags: promptData.tags,
-            country: fullCountry,
-            location: fullCountry,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        console.warn(
-          "Backend add prompt failed, keeping optimistic item. Status:",
-          response.status
-        );
-        // Keep the optimistic item in the UI
-        return optimistic;
-      }
-
-      const data = await response.json();
-      console.log("Prompt creation response:", data);
-
-      // Map backend response to our Prompt shape safely
-      const created: Prompt = {
-        id: data.id ?? optimistic.id,
-        prompt: data.prompt ?? promptData.prompt,
-        visibility:
-          data.visibility !== undefined
-            ? `${data.visibility}%`
-            : promptData.visibility,
-        sentiment: data.sentiment ?? promptData.sentiment,
-        position: data.position ? `#${data.position}` : promptData.position,
-        mentions: Array.isArray(data.mentions) ? data.mentions : [],
-        volume: data.volume !== undefined ? data.volume : promptData.volume,
-        volumeValue:
-          typeof data.volume === "number"
-            ? data.volume
-            : (promptData as any).volumeValue ?? 0,
-        tags: Array.isArray(data.tags) ? data.tags : promptData.tags,
-        addedAt: data.addedAt
-          ? new Date(data.addedAt)
-          : promptData.addedAt ?? new Date(),
-        location: data.country ?? data.location ?? fullCountry,
-      };
-
-      // Replace optimistic with backend-confirmed version
-      setActivePrompts((prev) => {
-        const withoutOptimistic = prev.filter((p) => p.id !== optimistic.id);
-        return [created, ...withoutOptimistic];
-      });
-
-      return created;
-    } catch (error) {
-      console.error("Error creating prompt:", error);
-      // In case of error, keep the optimistic item
-      throw error;
-    }
-  };
-
-  // Fetch inactive prompts
-  const fetchInactivePrompts = async () => {
-    try {
-      const token = localStorage.getItem("accessToken");
-
-      const response = await fetch(
-        "https://aeotest-production.up.railway.app/prompt/inactive",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch inactive prompts: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("Inactive Prompts API Response:", data);
-
-      // Process the data similar to active prompts
-      const processedPrompts = Array.isArray(data)
-        ? data.map((item) => {
-            const mentionsArray =
-              item.mentions && typeof item.mentions === "object"
-                ? Object.entries(item.mentions)
-                    .filter(([_, value]) => value === true)
-                    .map(([platform]) => ({
-                      platform:
-                        platform.charAt(0).toUpperCase() + platform.slice(1),
-                      color: getPlatformColor(platform),
-                    }))
-                : [];
-
-            const tagsArray = item.tags
-              ? Array.isArray(item.tags)
-                ? item.tags
-                : typeof item.tags === "string"
-                ? item.tags
-                    .split(",")
-                    .map((t) => t.trim())
-                    .filter(Boolean)
-                : []
-              : [];
-
-            const volumeValue = Number(item.volume) || 0;
-            const volumeBars = Math.min(
-              Math.max(Math.ceil(volumeValue / 100), 0),
-              5
-            );
-
-            return {
-              id: item.id,
-              prompt: item.prompt || "No prompt text",
-              visibility:
-                item.visibility !== undefined ? `${item.visibility}%` : "—",
-              sentiment: item.sentiment || "—",
-              position: item.position ? `#${item.position}` : "—",
-              mentions: mentionsArray,
-              volume: volumeBars,
-              volumeValue: volumeValue,
-              tags: tagsArray,
-              addedAt: item.added ? new Date(item.added) : new Date(),
-              location: item.location || "—",
-            };
-          })
-        : [];
-
-      console.log("Processed inactive prompts:", processedPrompts);
-      setInactivePrompts(processedPrompts);
-    } catch (error) {
-      console.error("Error fetching inactive prompts:", error);
-      setInactivePrompts([]);
-    }
-  };
-
-  // Helper function to get platform color
-  const getPlatformColor = (platform: string) => {
-    const colorMap: Record<string, string> = {
-      chatgpt: "#10a37f",
-      claude: "#d97757",
-      gemini: "#4285f4",
-      perplexity: "#7c3aed",
-      copilot: "#0078d4",
-    };
-    return colorMap[platform.toLowerCase()] || "#6b7280";
-  };
-
-  // Load prompts on component mount and when prompts change
+  // Load prompts on component mount
   useEffect(() => {
-    fetchActivePrompts();
-    fetchInactivePrompts();
-  }, []);
+    dispatch(fetchActivePrompts());
+    dispatch(fetchInactivePrompts());
+  }, [dispatch]);
 
-  const renderVolumeIndicator = (volume: number) => {
-    const maxBars = 5;
-    return (
-      <div className="flex items-center gap-0.5">
-        {[...Array(maxBars)].map((_, i) => (
-          <div
-            key={i}
-            className={`w-1 h-3 rounded-sm ${
-              i < volume ? "bg-green-500" : "bg-gray-200"
-            }`}
-          />
-        ))}
-      </div>
-    );
-  };
-
-  const getTimeAgo = (date: Date) => {
-    const now = new Date();
-    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    if (seconds < 60) return "just now";
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
-    const days = Math.floor(hours / 24);
-    return `${days} day${days > 1 ? "s" : ""} ago`;
-  };
 
   const handleExport = () => {
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      "Prompt,Volume\n" +
-      activePrompts.map((p) => `"${p.prompt}",${p.volume}`).join("\n");
+    // Create CSV header
+    const header = "Prompt,Volume,Country,Tags,Mentions\n";
+    
+    // Get the currently filtered and sorted prompts based on active tab
+    const promptsToExport = activeTab === "inactive" ? filteredInactivePrompts : filteredActivePrompts;
+    
+    // Check if there are prompts to export
+    if (promptsToExport.length === 0) {
+      alert("No prompts to export");
+      return;
+    }
+    
+    // Map prompts to CSV rows
+    const rows = promptsToExport.map((p) => {
+      // Format prompt text (escape quotes and wrap in quotes)
+      const promptText = `"${(p.prompt || '').replace(/"/g, '""')}"`;
+      
+      // Format volume
+      const volume = p.volumeValue || 0;
+      
+      // Format country (remove quotes if present)
+      const country = `"${(p.location || '—').replace(/"/g, '""')}"`;
+      
+      // Format tags (join multiple tags with semicolons)
+      const tags = p.tags && p.tags.length > 0 
+        ? `"${p.tags.join('; ')}"` 
+        : '""';
+      
+      // Format mentions (list all platforms with mentions)
+      const mentions = p.mentions && p.mentions.length > 0
+        ? `"${p.mentions.map(m => m.platform).join('; ')}"` 
+        : '""';
+      
+      return `${promptText},${volume},${country},${tags},${mentions}`;
+    }).join("\n");
 
+    // Combine header and rows
+    const csvContent = "data:text/csv;charset=utf-8," + header + rows;
+
+    // Create download link
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -429,11 +187,10 @@ const PromptsPage = () => {
     }
 
     try {
-      // Generate unique ID for the prompt
       const promptId = Date.now();
 
       // Create new prompt object
-      const newPromptData = {
+      const newPromptData: Omit<Prompt, "id"> = {
         prompt: newPromptText,
         visibility: "0%",
         sentiment: "—",
@@ -442,18 +199,17 @@ const PromptsPage = () => {
         volume: 0,
         volumeValue: 0,
         tags: selectedTags,
-        // Keep UI state code value, but createPrompt will map to full country name
         location: selectedCountry,
-        addedAt: new Date(),
+        addedAt: new Date().toISOString(),
       };
 
-      // Create prompt locally
-      await createPrompt(newPromptData);
+      // Create prompt using Redux thunk
+      await dispatch(createPrompt(newPromptData)).unwrap();
 
       // Increment mentions for each tag used in this prompt
       if (selectedTags.length > 0) {
         dispatch(
-          incrementTagMentions({ tagNames: selectedTags, promptId: promptId })
+          incrementTagMentions({ tagNames: selectedTags, promptId })
         );
       }
 
@@ -464,7 +220,7 @@ const PromptsPage = () => {
       setAddDialogOpen(false);
 
       // Refresh the prompts list
-      await fetchActivePrompts();
+      await dispatch(fetchActivePrompts()).unwrap();
 
       // Show success message
       alert("Prompt added successfully!");
@@ -478,12 +234,81 @@ const PromptsPage = () => {
     setSelectedTags(selectedTags.filter((tag) => tag !== tagToRemove));
   };
 
-  const filteredActivePrompts = activePrompts.filter((p) =>
-    p.prompt.toLowerCase().includes(searchTerm.toLowerCase())
+  const handleOpenTagDialog = (prompt: Prompt) => {
+    setCurrentPromptForTag(prompt);
+    setTagsToAssign(prompt.tags || []);
+    setTagDialogOpen(true);
+  };
+
+  const handleAssignTagsToPrompt = async () => {
+    if (!currentPromptForTag) return;
+
+    try {
+      // Update prompt tags using Redux thunk
+      await dispatch(
+        updatePromptTags({ 
+          promptId: currentPromptForTag.id, 
+          tags: tagsToAssign 
+        })
+      ).unwrap();
+
+      // Increment tag mentions
+      if (tagsToAssign.length > 0) {
+        dispatch(
+          incrementTagMentions({
+            tagNames: tagsToAssign,
+            promptId: currentPromptForTag.id,
+          })
+        );
+      }
+
+      alert("Tags updated successfully!");
+      setTagDialogOpen(false);
+      setCurrentPromptForTag(null);
+      setTagsToAssign([]);
+    } catch (error) {
+      console.error("Error updating tags:", error);
+      alert("Failed to update tags. Please try again.");
+    }
+  };
+
+  const handleRemoveTagFromAssignment = (tagToRemove: string) => {
+    setTagsToAssign(tagsToAssign.filter((tag) => tag !== tagToRemove));
+  };
+
+  const handleActiveSortToggle = () => {
+    if (activeSortOrder === null) {
+      setActiveSortOrder("desc"); // First click: newest first
+    } else if (activeSortOrder === "desc") {
+      setActiveSortOrder("asc"); // Second click: oldest first
+    } else {
+      setActiveSortOrder(null); // Third click: reset to default
+    }
+  };
+
+  const handleInactiveSortToggle = () => {
+    if (inactiveSortOrder === null) {
+      setInactiveSortOrder("desc"); // First click: newest first
+    } else if (inactiveSortOrder === "desc") {
+      setInactiveSortOrder("asc"); // Second click: oldest first
+    } else {
+      setInactiveSortOrder(null); // Third click: reset to default
+    }
+  };
+
+
+  const filteredActivePrompts = sortPromptsByDate(
+    activePrompts.filter((p) =>
+      p.prompt.toLowerCase().includes(searchTerm.toLowerCase())
+    ),
+    activeSortOrder
   );
 
-  const filteredInactivePrompts = inactivePrompts.filter((p) =>
-    p.prompt.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredInactivePrompts = sortPromptsByDate(
+    inactivePrompts.filter((p) =>
+      p.prompt.toLowerCase().includes(searchTerm.toLowerCase())
+    ),
+    inactiveSortOrder
   );
 
   const filteredSuggestedPrompts = suggestedPrompts.filter((p) =>
@@ -492,17 +317,17 @@ const PromptsPage = () => {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedPromptIds(filteredActivePrompts.map((p) => p.id));
+      dispatch(setSelectedPromptIds(filteredActivePrompts.map((p) => p.id)));
     } else {
-      setSelectedPromptIds([]);
+      dispatch(setSelectedPromptIds([]));
     }
   };
 
   const handleSelectPrompt = (promptId: number, checked: boolean) => {
     if (checked) {
-      setSelectedPromptIds([...selectedPromptIds, promptId]);
+      dispatch(setSelectedPromptIds([...selectedPromptIds, promptId]));
     } else {
-      setSelectedPromptIds(selectedPromptIds.filter((id) => id !== promptId));
+      dispatch(setSelectedPromptIds(selectedPromptIds.filter((id) => id !== promptId)));
     }
   };
 
@@ -510,64 +335,50 @@ const PromptsPage = () => {
     alert(`Assign tags to ${selectedPromptIds.length} selected prompt(s)`);
   };
 
-  const handleDeactivate = async () => {
-    if (
-      !confirm(
-        `Are you sure you want to deactivate ${selectedPromptIds.length} prompt(s)?`
-      )
-    ) {
-      return;
-    }
+  const handleDeactivate = () => {
+    setConfirmDialog({
+      open: true,
+      title: "Deactivate Prompts",
+      description: `Are you sure you want to deactivate ${selectedPromptIds.length} prompt(s)?`,
+      onConfirm: async () => {
+        try {
+          await dispatch(deactivatePromptsThunk(selectedPromptIds)).unwrap();
+          
+          // Refresh both active and inactive prompts from server
+          await Promise.all([
+            dispatch(fetchActivePrompts()).unwrap(),
+            dispatch(fetchInactivePrompts()).unwrap()
+          ]);
 
-    try {
-      const token = localStorage.getItem("accessToken");
-
-   
-      const response = await fetch(
-        "https://aeotest-production.up.railway.app/prompt/state",
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            prompt_ids: selectedPromptIds,
-            is_active: false,
-          }),
+          toast({
+            title: "Success",
+            description: `Successfully deactivated ${selectedPromptIds.length} prompt(s).`,
+          });
+        } catch (error) {
+          console.error("Error deactivating prompts:", error);
+          toast({
+            title: "Error",
+            description: "Failed to deactivate prompts. Please try again.",
+            variant: "destructive",
+          });
         }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to deactivate prompts: ${response.status}`);
-      }
-
-      console.log("Prompts deactivated successfully");
-
-      // Refresh both active and inactive prompts from server
-      await Promise.all([fetchActivePrompts(), fetchInactivePrompts()]);
-      setSelectedPromptIds([]);
-    } catch (error) {
-      console.error("Error deactivating prompts:", error);
-      alert("Failed to deactivate prompts. Please try again.");
-    }
+      },
+    });
   };
 
   const handleSelectAllInactive = (checked: boolean) => {
     if (checked) {
-      setSelectedInactiveIds(filteredInactivePrompts.map((p) => p.id));
+      dispatch(setSelectedInactiveIds(filteredInactivePrompts.map((p) => p.id)));
     } else {
-      setSelectedInactiveIds([]);
+      dispatch(setSelectedInactiveIds([]));
     }
   };
 
   const handleSelectInactive = (promptId: number, checked: boolean) => {
     if (checked) {
-      setSelectedInactiveIds([...selectedInactiveIds, promptId]);
+      dispatch(setSelectedInactiveIds([...selectedInactiveIds, promptId]));
     } else {
-      setSelectedInactiveIds(
-        selectedInactiveIds.filter((id) => id !== promptId)
-      );
+      dispatch(setSelectedInactiveIds(selectedInactiveIds.filter((id) => id !== promptId)));
     }
   };
 
@@ -575,60 +386,51 @@ const PromptsPage = () => {
     alert(`Assign tags to ${selectedInactiveIds.length} selected prompt(s)`);
   };
 
-  const handleActivate = async () => {
-    if (
-      !confirm(
-        `Are you sure you want to activate ${selectedInactiveIds.length} prompt(s)?`
-      )
-    ) {
-      return;
-    }
+  const handleActivate = () => {
+    setConfirmDialog({
+      open: true,
+      title: "Activate Prompts",
+      description: `Are you sure you want to activate ${selectedInactiveIds.length} prompt(s)?`,
+      onConfirm: async () => {
+        try {
+          await dispatch(activatePromptsThunk(selectedInactiveIds)).unwrap();
+          
+          // Refresh both active and inactive prompts from server
+          await Promise.all([
+            dispatch(fetchActivePrompts()).unwrap(),
+            dispatch(fetchInactivePrompts()).unwrap()
+          ]);
 
-    try {
-      const token = localStorage.getItem("accessToken");
-
-      // Call API to change prompt state to active
-      const response = await fetch(
-        "https://aeotest-production.up.railway.app/prompt/state",
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            prompt_ids: selectedInactiveIds,
-            is_active: true,
-          }),
+          toast({
+            title: "Success",
+            description: `Successfully activated ${selectedInactiveIds.length} prompt(s).`,
+          });
+        } catch (error) {
+          console.error("Error activating prompts:", error);
+          toast({
+            title: "Error",
+            description: "Failed to activate prompts. Please try again.",
+            variant: "destructive",
+          });
         }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to activate prompts: ${response.status}`);
-      }
-
-      console.log("Prompts activated successfully");
-
-      // Refresh both active and inactive prompts from server
-      await Promise.all([fetchActivePrompts(), fetchInactivePrompts()]);
-      setSelectedInactiveIds([]);
-    } catch (error) {
-      console.error("Error activating prompts:", error);
-      alert("Failed to activate prompts. Please try again.");
-    }
+      },
+    });
   };
 
   const handleDelete = () => {
-    if (
-      confirm(
-        `Are you sure you want to permanently delete ${selectedInactiveIds.length} prompt(s)?`
-      )
-    ) {
-      setInactivePrompts(
-        inactivePrompts.filter((p) => !selectedInactiveIds.includes(p.id))
-      );
-      setSelectedInactiveIds([]);
-    }
+    setConfirmDialog({
+      open: true,
+      title: "Delete Prompts",
+      description: `Are you sure you want to permanently delete ${selectedInactiveIds.length} prompt(s)? This action cannot be undone.`,
+      onConfirm: () => {
+        dispatch(deleteInactivePrompts(selectedInactiveIds));
+        dispatch(setSelectedInactiveIds([]));
+        toast({
+          title: "Deleted",
+          description: `Successfully deleted ${selectedInactiveIds.length} prompt(s).`,
+        });
+      },
+    });
   };
 
   const handleFileUpload = (file: File) => {
@@ -665,6 +467,23 @@ const PromptsPage = () => {
     }
   };
 
+  // UI Helper function for rendering volume indicator
+  const renderVolumeIndicator = (volume: number) => {
+    const maxBars = 5;
+    return (
+      <div className="flex items-center gap-0.5">
+        {[...Array(maxBars)].map((_, i) => (
+          <div
+            key={i}
+            className={`w-1 h-3 rounded-sm ${
+              i < volume ? "bg-green-500" : "bg-gray-200"
+            }`}
+          />
+        ))}
+      </div>
+    );
+  };
+
   const processBulkUpload = async () => {
     if (!uploadedFile) {
       alert("Please select a file first");
@@ -686,18 +505,30 @@ const PromptsPage = () => {
       }
 
       const prompts = [];
+      let isFirstLine = true;
 
       for (const line of lines) {
-        // Simple comma split - handle both quoted and unquoted
-        const parts = line.split(",");
+        // Skip header line
+        if (isFirstLine) {
+          isFirstLine = false;
+          // Check if it's a header line
+          if (line.toLowerCase().includes("prompt") && line.toLowerCase().includes("volume")) {
+            continue;
+          }
+        }
+
+        // Use the parseCSVLine utility function
+        const parts = parseCSVLine(line);
 
         if (parts.length >= 1) {
-          const promptText = parts[0].replace(/^"|"$/g, "").trim();
+          const promptText = parts[0].trim();
 
           if (promptText && promptText.toLowerCase() !== "prompt") {
-            const tagsText = parts[1]
-              ? parts[1].replace(/^"|"$/g, "").trim()
-              : "";
+            // Parse CSV format: Prompt, Volume, Country, Tags, Mentions
+            const volume = parts[1] ? parseInt(parts[1]) || 0 : 0;
+            const country = parts[2] ? parts[2].trim() : "India"; // Default to India if not provided
+            
+            const tagsText = parts[3] ? parts[3].trim() : "";
             const tags = tagsText
               ? tagsText
                   .split(";")
@@ -712,8 +543,10 @@ const PromptsPage = () => {
               position: "—",
               mentions: [],
               volume: 0,
+              volumeValue: volume,
               tags,
-              addedAt: new Date(),
+              location: country,
+              addedAt: new Date().toISOString(),
             });
           }
         }
@@ -722,16 +555,14 @@ const PromptsPage = () => {
       console.log("Parsed prompts:", prompts);
 
       if (prompts.length === 0) {
-        alert(
-          "No valid prompts found. Make sure your CSV has prompts in the first column."
-        );
+        alert("No valid prompts found. Make sure your CSV has prompts in the first column.");
         return;
       }
 
       for (const promptData of prompts) {
-        await createPrompt(promptData);
+        await dispatch(createPrompt(promptData)).unwrap();
         if (promptData.tags.length > 0) {
-          incrementTagMentions(promptData.tags);
+          dispatch(incrementTagMentions({ tagNames: promptData.tags, promptId: Date.now() }));
         }
       }
 
@@ -740,7 +571,7 @@ const PromptsPage = () => {
       setAddDialogOpen(false);
     } catch (error) {
       console.error("CSV processing error:", error);
-      alert(`Error: ${error.message}`);
+      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -756,7 +587,7 @@ const PromptsPage = () => {
           <MessageSquare className="w-5 h-5 text-muted-foreground" />
           <h1 className="text-lg font-semibold">Prompts</h1>
           <span className="text-sm text-muted-foreground">
-            · {activePrompts.length} / 25 Prompts
+            · {activePrompts.length + inactivePrompts.length} / 25 Prompts
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -792,7 +623,7 @@ const PromptsPage = () => {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="active" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="space-y-4">
           <TabsList className="bg-muted/50">
             <TabsTrigger
@@ -880,7 +711,22 @@ const PromptsPage = () => {
                                 Location
                               </TableHead>
                               <TableHead className="font-medium text-xs text-center min-w-[120px]">
-                                Added
+                                <button
+                                  onClick={handleActiveSortToggle}
+                                  className="flex items-center justify-center gap-1 hover:text-blue-600 transition-colors w-full"
+                                  title="Click to sort by date"
+                                >
+                                  <span>Added</span>
+                                  {activeSortOrder === null && (
+                                    <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                                  )}
+                                  {activeSortOrder === "desc" && (
+                                    <ArrowDown className="w-3 h-3 text-blue-600" />
+                                  )}
+                                  {activeSortOrder === "asc" && (
+                                    <ArrowUp className="w-3 h-3 text-blue-600" />
+                                  )}
+                                </button>
                               </TableHead>
                             </TableRow>
                           </TableHeader>
@@ -919,7 +765,7 @@ const PromptsPage = () => {
                                     <div className="h-6 bg-gray-200 rounded animate-pulse mx-auto w-16"></div>
                                   </TableCell>
                                   <TableCell className="py-3">
-                                    <div className="h-4 bg-gray-200 rounded animate-pulse mx-auto w-8"></div>
+                                    <div className="h-6 w-6 bg-gray-200 rounded-md animate-pulse mx-auto"></div>
                                   </TableCell>
                                   <TableCell className="py-3">
                                     <div className="h-4 bg-gray-200 rounded animate-pulse mx-auto w-16"></div>
@@ -973,21 +819,31 @@ const PromptsPage = () => {
 
                                   <TableCell className="py-3">
                                     <div className="flex items-center justify-center gap-1">
-                                      {prompt.mentions.map((mention, idx) => (
-                                        <Avatar
-                                          key={idx}
-                                          className="w-5 h-5 rounded-md"
-                                        >
-                                          <AvatarFallback
-                                            className="rounded-md text-white text-[10px] font-semibold"
-                                            style={{
-                                              backgroundColor: mention.color,
-                                            }}
+                                      {prompt.mentions.map((mention, idx) => {
+                                        const domain = getDomainForBrand(mention.platform);
+                                        const faviconUrl = getFaviconUrl(domain, 32);
+                                        return (
+                                          <Avatar
+                                            key={idx}
+                                            className="w-5 h-5 rounded-md border border-gray-200"
+                                            title={mention.platform}
                                           >
-                                            {mention.platform[0]}
-                                          </AvatarFallback>
-                                        </Avatar>
-                                      ))}
+                                            <AvatarImage
+                                              src={faviconUrl}
+                                              alt={mention.platform}
+                                              className="rounded-md"
+                                            />
+                                            <AvatarFallback
+                                              className="rounded-md text-white text-[10px] font-semibold"
+                                              style={{
+                                                backgroundColor: mention.color,
+                                              }}
+                                            >
+                                              {mention.platform[0]}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                        );
+                                      })}
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-center py-3">
@@ -999,7 +855,11 @@ const PromptsPage = () => {
                                   </TableCell>
                                   <TableCell className="text-center py-3">
                                     {prompt.tags.length > 0 ? (
-                                      <div className="flex items-center justify-center gap-1 flex-wrap">
+                                      <div 
+                                        className="flex items-center justify-center gap-1 flex-wrap cursor-pointer hover:opacity-70 transition-opacity"
+                                        onClick={() => handleOpenTagDialog(prompt)}
+                                        title="Click to edit tags"
+                                      >
                                         {prompt.tags.map((tag, idx) => (
                                           <Badge
                                             key={idx}
@@ -1014,18 +874,28 @@ const PromptsPage = () => {
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="h-7 text-xs text-muted-foreground"
+                                        className="h-7 text-xs text-muted-foreground hover:text-blue-600"
+                                        onClick={() => handleOpenTagDialog(prompt)}
                                       >
                                         Add tags
                                       </Button>
                                     )}
                                   </TableCell>
                                   <TableCell className="text-center py-3">
-                                    <span className="text-sm text-muted-foreground">
-                                      {prompt.location !== "—"
-                                        ? prompt.location
-                                        : "—"}
-                                    </span>
+                                    {prompt.location !== "—" && getCountryFlag(prompt.location) ? (
+                                      <span 
+                                        className="text-2xl" 
+                                        title={prompt.location}
+                                        role="img"
+                                        aria-label={prompt.location}
+                                      >
+                                        {getCountryFlag(prompt.location)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-sm text-muted-foreground">
+                                        —
+                                      </span>
+                                    )}
                                   </TableCell>
                                   <TableCell className="text-center py-3">
                                     <span className="text-sm text-muted-foreground">
@@ -1156,11 +1026,32 @@ const PromptsPage = () => {
 
           <TabsContent value="inactive" className="mt-0">
             {inactivePrompts.length > 0 ? (
-              <Card className="border-border/40">
-                <CardContent className="p-0">
-                  <div className="relative">
-                    <div className="overflow-x-auto">
-                      <Table>
+              <>
+                <div className="flex items-center justify-end gap-3 mb-4">
+                  <div className="relative flex-1 max-w-xs">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 h-9"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="h-9"
+                    onClick={handleExport}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Export
+                  </Button>
+                </div>
+
+                <Card className="border-border/40">
+                  <CardContent className="p-0">
+                    <div className="relative">
+                      <div className="overflow-x-auto">
+                        <Table>
                         <TableHeader>
                           <TableRow className="hover:bg-transparent">
                             <TableHead className="font-medium text-xs w-[40px] sticky left-0 bg-background z-10">
@@ -1198,7 +1089,22 @@ const PromptsPage = () => {
                               Location
                             </TableHead>
                             <TableHead className="font-medium text-xs text-center min-w-[120px]">
-                              Added
+                              <button
+                                onClick={handleInactiveSortToggle}
+                                className="flex items-center justify-center gap-1 hover:text-blue-600 transition-colors w-full"
+                                title="Click to sort by date"
+                              >
+                                <span>Added</span>
+                                {inactiveSortOrder === null && (
+                                  <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                                )}
+                                {inactiveSortOrder === "desc" && (
+                                  <ArrowDown className="w-3 h-3 text-blue-600" />
+                                )}
+                                {inactiveSortOrder === "asc" && (
+                                  <ArrowUp className="w-3 h-3 text-blue-600" />
+                                )}
+                              </button>
                             </TableHead>
                           </TableRow>
                         </TableHeader>
@@ -1227,21 +1133,31 @@ const PromptsPage = () => {
 
                               <TableCell className="py-3">
                                 <div className="flex items-center justify-center gap-1">
-                                  {prompt.mentions.map((mention, idx) => (
-                                    <Avatar
-                                      key={idx}
-                                      className="w-5 h-5 rounded-md"
-                                    >
-                                      <AvatarFallback
-                                        className="rounded-md text-white text-[10px] font-semibold"
-                                        style={{
-                                          backgroundColor: mention.color,
-                                        }}
+                                  {prompt.mentions.map((mention, idx) => {
+                                    const domain = getDomainForBrand(mention.platform);
+                                    const faviconUrl = getFaviconUrl(domain, 32);
+                                    return (
+                                      <Avatar
+                                        key={idx}
+                                        className="w-5 h-5 rounded-md border border-gray-200"
+                                        title={mention.platform}
                                       >
-                                        {mention.platform[0]}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                  ))}
+                                        <AvatarImage
+                                          src={faviconUrl}
+                                          alt={mention.platform}
+                                          className="rounded-md"
+                                        />
+                                        <AvatarFallback
+                                          className="rounded-md text-white text-[10px] font-semibold"
+                                          style={{
+                                            backgroundColor: mention.color,
+                                          }}
+                                        >
+                                          {mention.platform[0]}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    );
+                                  })}
                                 </div>
                               </TableCell>
                               <TableCell className="text-center py-3">
@@ -1253,7 +1169,11 @@ const PromptsPage = () => {
                               </TableCell>
                               <TableCell className="text-center py-3">
                                 {prompt.tags.length > 0 ? (
-                                  <div className="flex items-center justify-center gap-1 flex-wrap">
+                                  <div 
+                                    className="flex items-center justify-center gap-1 flex-wrap cursor-pointer hover:opacity-70 transition-opacity"
+                                    onClick={() => handleOpenTagDialog(prompt)}
+                                    title="Click to edit tags"
+                                  >
                                     {prompt.tags.map((tag, idx) => (
                                       <Badge
                                         key={idx}
@@ -1268,16 +1188,28 @@ const PromptsPage = () => {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-7 text-xs text-muted-foreground"
+                                    className="h-7 text-xs text-muted-foreground hover:text-blue-600"
+                                    onClick={() => handleOpenTagDialog(prompt)}
                                   >
                                     Add tags
                                   </Button>
                                 )}
                               </TableCell>
                               <TableCell className="text-center py-3">
-                                <span className="text-sm text-muted-foreground">
-                                  —
-                                </span>
+                                {prompt.location !== "—" && getCountryFlag(prompt.location) ? (
+                                  <span 
+                                    className="text-2xl" 
+                                    title={prompt.location}
+                                    role="img"
+                                    aria-label={prompt.location}
+                                  >
+                                    {getCountryFlag(prompt.location)}
+                                  </span>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">
+                                    —
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell className="text-center py-3">
                                 <span className="text-sm text-muted-foreground">
@@ -1294,6 +1226,7 @@ const PromptsPage = () => {
                   </div>
                 </CardContent>
               </Card>
+              </>
             ) : (
               <Card className="border-border/40">
                 <CardContent className="p-12 text-center">
@@ -1380,36 +1313,24 @@ const PromptsPage = () => {
 
       {/* Add Prompt Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="max-w-2xl border-0 shadow-2xl p-0 gap-0 overflow-hidden">
-          {/* Header with gradient background */}
-          <div className="relative bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 px-8 py-8">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
-
-            <DialogHeader className="relative space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <DialogTitle className="text-2xl font-bold text-white">
-                    Add New Prompt
-                  </DialogTitle>
-                  <p className="text-sm text-purple-100 mt-1">
-                    Track prompts and monitor their performance
-                  </p>
-                </div>
-              </div>
-            </DialogHeader>
-          </div>
+        <DialogContent className="max-w-2xl p-0 gap-0 bg-white">
+          {/* Header */}
+          <DialogHeader className="px-6 pt-6 pb-4 border-b bg-white">
+            <DialogTitle className="text-xl font-semibold text-black">
+              Add New Prompt
+            </DialogTitle>
+            <p className="text-sm text-gray-600 mt-1">
+              Track prompts and monitor their performance
+            </p>
+          </DialogHeader>
 
           {/* Tabs */}
-          <div className="flex border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+          <div className="flex border-b bg-gray-50">
             <button
-              className={`flex-1 px-6 py-4 text-sm font-semibold transition-all duration-200 relative ${
+              className={`flex-1 px-6 py-3 text-sm font-medium transition-colors relative ${
                 addPromptTab === "single"
-                  ? "text-purple-600 dark:text-purple-400"
-                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                  ? "text-black bg-white"
+                  : "text-gray-600 hover:text-black"
               }`}
               onClick={() => setAddPromptTab("single")}
             >
@@ -1418,14 +1339,14 @@ const PromptsPage = () => {
                 Add Prompt
               </div>
               {addPromptTab === "single" && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-600 to-indigo-600"></div>
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black"></div>
               )}
             </button>
             <button
-              className={`flex-1 px-6 py-4 text-sm font-semibold transition-all duration-200 relative ${
+              className={`flex-1 px-6 py-3 text-sm font-medium transition-colors relative ${
                 addPromptTab === "bulk"
-                  ? "text-purple-600 dark:text-purple-400"
-                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                  ? "text-black bg-white"
+                  : "text-gray-600 hover:text-black"
               }`}
               onClick={() => setAddPromptTab("bulk")}
             >
@@ -1434,63 +1355,55 @@ const PromptsPage = () => {
                 Bulk Upload
               </div>
               {addPromptTab === "bulk" && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-600 to-indigo-600"></div>
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black"></div>
               )}
             </button>
           </div>
 
           {addPromptTab === "single" ? (
-            <div className="px-8 py-6 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-950">
+            <div className="px-6 py-6 bg-white">
               <div className="space-y-6">
                 {/* Prompt Field */}
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   <Label
                     htmlFor="prompt"
-                    className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2"
+                    className="text-sm font-semibold text-black flex items-center gap-2"
                   >
-                    <FileText className="w-4 h-4 text-purple-600" />
                     Prompt Text
-                    <span className="text-red-500">*</span>
+                    <span className="text-red-600">*</span>
                   </Label>
-                  <div className="relative">
-                    <Textarea
-                      id="prompt"
-                      placeholder="What is the best insurance? (Each line will be a separate prompt)"
-                      value={newPromptText}
-                      onChange={(e) => setNewPromptText(e.target.value)}
-                      rows={4}
-                      maxLength={200}
-                      className="resize-none text-base border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all duration-200 rounded-xl"
-                    />
-                  </div>
+                  <Textarea
+                    id="prompt"
+                    placeholder="What is the best insurance? (Each line will be a separate prompt)"
+                    value={newPromptText}
+                    onChange={(e) => setNewPromptText(e.target.value)}
+                    rows={4}
+                    maxLength={200}
+                    className="resize-none border-gray-300 focus:border-black focus:ring-black"
+                  />
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 pl-1">
-                      <span className="w-1 h-1 rounded-full bg-purple-500"></span>
+                    <p className="text-xs text-gray-600">
                       Create competitive prompts without mentioning your brand
                     </p>
-                    <span className="text-xs font-medium text-gray-500">
+                    <span className="text-xs text-gray-500">
                       {newPromptText.length}/200
                     </span>
                   </div>
                 </div>
 
                 {/* Country Field */}
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   <Label
                     htmlFor="country"
-                    className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2"
+                    className="text-sm font-semibold text-black"
                   >
-                    <Globe2 className="w-4 h-4 text-blue-600" />
                     IP Address Region
                   </Label>
                   <Select
                     value={selectedCountry}
                     onValueChange={setSelectedCountry}
                   >
-                    <SelectTrigger
-                      id="country"
-                      className="h-12 border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 rounded-xl"
-                    >
+                    <SelectTrigger id="country">
                       <SelectValue>
                         <div className="flex items-center gap-2">
                           <span className="text-lg">🇮🇳</span>
@@ -1519,71 +1432,55 @@ const PromptsPage = () => {
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 pl-1">
-                    <span className="w-1 h-1 rounded-full bg-blue-500"></span>
+                  <p className="text-xs text-gray-600">
                     Select the region for prompt analysis
                   </p>
                 </div>
 
                 {/* Tags Field */}
                 <div className="space-y-3">
-                  <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <Tag className="w-4 h-4 text-blue-600" />
+                  <Label className="text-sm font-semibold text-black">
                     Tags
-                    <span className="text-xs font-normal text-gray-500">
+                    <span className="text-xs font-normal text-gray-600 ml-1">
                       (Optional)
                     </span>
                   </Label>
 
                   {/* Selected Tags */}
                   {selectedTags.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap p-3 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl border border-blue-200/50 dark:border-blue-800/50">
-                      {selectedTags.map((tagName, idx) => {
-                        const tagColor =
-                          availableTags.find((t) => t.name === tagName)
-                            ?.color || "#3b82f6";
-                        return (
-                          <Badge
-                            key={idx}
-                            className="text-xs px-3 py-1.5 font-medium shadow-sm"
-                            style={{
-                              backgroundColor: tagColor + "20",
-                              color: tagColor,
-                              border: `1px solid ${tagColor}40`,
-                            }}
+                    <div className="flex items-center gap-2 flex-wrap p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      {selectedTags.map((tagName, idx) => (
+                        <Badge
+                          key={idx}
+                          variant="secondary"
+                          className="text-xs px-2 py-1 bg-black text-white hover:bg-gray-800"
+                        >
+                          {tagName}
+                          <button
+                            onClick={() => handleRemoveTag(tagName)}
+                            className="ml-1.5 hover:opacity-70"
                           >
-                            {tagName}
-                            <button
-                              onClick={() => handleRemoveTag(tagName)}
-                              className="ml-2 hover:opacity-70 transition-opacity"
-                            >
-                              ×
-                            </button>
-                          </Badge>
-                        );
-                      })}
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
                     </div>
                   )}
 
                   {/* Available Tags - Quick Select */}
                   {availableTags.length > 0 ? (
                     <div className="space-y-2">
-                      <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
-                        <Sparkles className="w-3 h-3 text-blue-500" />
+                      <p className="text-xs text-gray-600">
                         Click to add tags:
                       </p>
-                      <div className="flex items-center gap-2 flex-wrap p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center gap-2 flex-wrap p-3 bg-gray-50 rounded-lg border border-gray-200">
                         {availableTags
                           .filter((tag) => !selectedTags.includes(tag.name))
                           .map((tag) => (
                             <Badge
                               key={tag.id}
-                              className="cursor-pointer text-xs px-3 py-1.5 hover:shadow-md transition-all hover:scale-105"
-                              style={{
-                                backgroundColor: tag.color + "15",
-                                color: tag.color,
-                                border: `1px solid ${tag.color}30`,
-                              }}
+                              variant="outline"
+                              className="cursor-pointer text-xs px-2 py-1 border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-black transition-colors"
                               onClick={() => {
                                 if (!selectedTags.includes(tag.name)) {
                                   setSelectedTags([...selectedTags, tag.name]);
@@ -1596,9 +1493,9 @@ const PromptsPage = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center py-4 px-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border border-dashed border-blue-300 dark:border-blue-700">
-                      <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
-                        💡 No tags available yet.
+                    <div className="text-center py-4 px-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                      <p className="text-xs text-gray-600 mb-3">
+                        No tags available yet.
                       </p>
                       <Button
                         variant="outline"
@@ -1606,7 +1503,7 @@ const PromptsPage = () => {
                         onClick={() =>
                           navigate("/dashboard/tags?createNew=true")
                         }
-                        className="h-8 text-xs bg-white dark:bg-gray-900 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-400 dark:border-blue-600"
+                        className="h-8 text-xs border-gray-300 hover:bg-black hover:text-white transition-colors"
                       >
                         <Plus className="w-3 h-3 mr-1.5" />
                         Create Your First Tag
@@ -1620,7 +1517,7 @@ const PromptsPage = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => navigate("/dashboard/tags?createNew=true")}
-                      className="w-full h-9 text-xs bg-gradient-to-r from-blue-500/10 to-purple-500/10 hover:from-blue-500/20 hover:to-purple-500/20 border-blue-300 dark:border-blue-700 hover:border-blue-400"
+                      className="w-full h-9 text-xs border-gray-300 hover:bg-black hover:text-white transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5 mr-1.5" />
                       Create New Tag
@@ -1630,31 +1527,42 @@ const PromptsPage = () => {
               </div>
 
               {/* Footer */}
-              <div className="px-8 py-6 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800">
-                <DialogFooter className="gap-3 sm:gap-3">
+              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                <DialogFooter className="gap-2">
                   <Button
                     variant="outline"
                     onClick={() => setAddDialogOpen(false)}
-                    className="h-11 px-6 rounded-xl border-2 hover:bg-gray-50 dark:hover:bg-gray-900 transition-all duration-200 font-medium"
+                    className="h-9 border-gray-300 hover:bg-gray-100"
+                    disabled={isAddingPrompt}
                   >
                     Cancel
                   </Button>
                   <Button
                     onClick={handleAddPrompt}
-                    className="h-11 px-8 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-500/30 hover:shadow-xl hover:shadow-purple-500/40 transition-all duration-200 font-semibold"
+                    disabled={isAddingPrompt}
+                    className="h-9 bg-black hover:bg-black/90 text-white"
                   >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Prompt
+                    {isAddingPrompt ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Prompt
+                      </>
+                    )}
                   </Button>
                 </DialogFooter>
               </div>
             </div>
           ) : (
-            <div className="space-y-6 p-6">
+            <div className="space-y-6 p-6 bg-white">
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <div className="mb-4">
                   <svg
-                    className="w-32 h-32 text-muted-foreground/20"
+                    className="w-32 h-32 text-gray-200"
                     viewBox="0 0 200 200"
                     fill="none"
                   >
@@ -1704,11 +1612,14 @@ const PromptsPage = () => {
                     />
                   </svg>
                 </div>
-                <p className="text-sm text-muted-foreground mb-1">
-                  CSV format: prompt,tags (tags separated by semicolons)
+                <p className="text-sm text-gray-700 font-semibold mb-1">
+                  CSV format: Prompt, Volume, Country, Tags, Mentions
                 </p>
-                <p className="text-xs text-muted-foreground mb-6">
-                  Example: "What is the best insurance?","insurance;comparison"
+                <p className="text-xs text-gray-600 mb-2">
+                  Example: "What is the best insurance?",485,"India","insurance;comparison",""
+                </p>
+                <p className="text-xs text-black mb-6">
+                  💡 Tip: You can export your prompts and use that CSV format for bulk upload
                 </p>
 
                 <input
@@ -1722,8 +1633,8 @@ const PromptsPage = () => {
                 <div
                   className={`w-full border-2 border-dashed rounded-lg p-12 transition-colors cursor-pointer ${
                     isDragOver
-                      ? "border-blue-400 bg-blue-50"
-                      : "border-muted-foreground/25 hover:border-muted-foreground/50"
+                      ? "border-black bg-gray-50"
+                      : "border-gray-300 hover:border-black"
                   }`}
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
@@ -1733,16 +1644,16 @@ const PromptsPage = () => {
                   }
                 >
                   <div className="flex flex-col items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                      <Download className="w-6 h-6 text-muted-foreground" />
+                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                      <Download className="w-6 h-6 text-gray-700" />
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-gray-700">
                       Drag and drop your CSV file here, or{" "}
-                      <span className="text-blue-600 underline cursor-pointer">
+                      <span className="text-black font-semibold underline cursor-pointer">
                         click to browse
                       </span>
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-gray-600">
                       Supported format: CSV files only
                     </p>
                   </div>
@@ -1751,11 +1662,11 @@ const PromptsPage = () => {
 
               {uploadedFile && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-300 rounded-lg">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center">
                         <svg
-                          className="w-4 h-4 text-green-600"
+                          className="w-4 h-4 text-white"
                           fill="currentColor"
                           viewBox="0 0 20 20"
                         >
@@ -1767,10 +1678,10 @@ const PromptsPage = () => {
                         </svg>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-green-800">
+                        <p className="text-sm font-semibold text-black">
                           {uploadedFile.name}
                         </p>
-                        <p className="text-xs text-green-600">
+                        <p className="text-xs text-gray-600">
                           {(uploadedFile.size / 1024).toFixed(1)} KB
                         </p>
                       </div>
@@ -1779,7 +1690,7 @@ const PromptsPage = () => {
                       variant="ghost"
                       size="sm"
                       onClick={() => setUploadedFile(null)}
-                      className="text-green-600 hover:text-green-700"
+                      className="text-gray-700 hover:text-black hover:bg-gray-100"
                     >
                       Remove
                     </Button>
@@ -1794,20 +1705,224 @@ const PromptsPage = () => {
                     setAddDialogOpen(false);
                     setUploadedFile(null);
                   }}
+                  disabled={isAddingPrompt}
+                  className="border-gray-300 hover:bg-gray-100"
                 >
                   Cancel
                 </Button>
                 {uploadedFile && (
                   <Button
                     onClick={processBulkUpload}
-                    className="bg-black hover:bg-black/90 text-white"
+                    disabled={isAddingPrompt}
+                    className="bg-black hover:bg-black/90 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Upload Prompts
+                    {isAddingPrompt ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Upload Prompts
+                      </>
+                    )}
                   </Button>
                 )}
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Tag Assignment Dialog */}
+      <Dialog open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
+        <DialogContent className="max-w-xl p-0 gap-0 bg-white">
+          {/* Header */}
+          <DialogHeader className="px-6 pt-6 pb-4 border-b bg-white">
+            <DialogTitle className="text-xl font-semibold text-black">
+              Manage Tags
+            </DialogTitle>
+            <p className="text-sm text-gray-600 mt-1">
+              Add or remove tags for this prompt
+            </p>
+          </DialogHeader>
+
+          {/* Content */}
+          <div className="px-6 py-6 bg-white">
+            <div className="space-y-6">
+              {/* Prompt Preview */}
+              {currentPromptForTag && (
+                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">
+                    Prompt:
+                  </Label>
+                  <p className="text-sm text-black">
+                    {currentPromptForTag.prompt}
+                  </p>
+                </div>
+              )}
+
+              {/* Selected Tags */}
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold text-black">
+                  Selected Tags
+                </Label>
+                
+                {tagsToAssign.length > 0 ? (
+                  <div className="flex items-center gap-2 flex-wrap p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    {tagsToAssign.map((tagName, idx) => (
+                      <Badge
+                        key={idx}
+                        variant="secondary"
+                        className="text-xs px-2 py-1 bg-black text-white hover:bg-gray-800"
+                      >
+                        {tagName}
+                        <button
+                          onClick={() => handleRemoveTagFromAssignment(tagName)}
+                          className="ml-1.5 hover:opacity-70"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300 text-center">
+                    <p className="text-sm text-gray-600">
+                      No tags selected
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Available Tags - Quick Select */}
+              {availableTags.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-600">
+                    Click to add tags:
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap p-3 bg-gray-50 rounded-lg border border-gray-200 max-h-48 overflow-y-auto">
+                    {availableTags
+                      .filter((tag) => !tagsToAssign.includes(tag.name))
+                      .map((tag) => (
+                        <Badge
+                          key={tag.id}
+                          variant="outline"
+                          className="cursor-pointer text-xs px-2 py-1 border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-black transition-colors"
+                          onClick={() => {
+                            if (!tagsToAssign.includes(tag.name)) {
+                              setTagsToAssign([...tagsToAssign, tag.name]);
+                            }
+                          }}
+                        >
+                          {tag.name}
+                        </Badge>
+                      ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4 px-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                  <p className="text-xs text-gray-600 mb-3">
+                    No tags available yet.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setTagDialogOpen(false);
+                      navigate("/dashboard/tags?createNew=true");
+                    }}
+                    className="h-8 text-xs border-gray-300 hover:bg-black hover:text-white transition-colors"
+                  >
+                    <Plus className="w-3 h-3 mr-1.5" />
+                    Create Your First Tag
+                  </Button>
+                </div>
+              )}
+
+              {/* Create New Tag Button */}
+              {availableTags.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setTagDialogOpen(false);
+                    navigate("/dashboard/tags?createNew=true");
+                  }}
+                  className="w-full h-9 text-xs border-gray-300 hover:bg-black hover:text-white transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1.5" />
+                  Create New Tag
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setTagDialogOpen(false);
+                  setCurrentPromptForTag(null);
+                  setTagsToAssign([]);
+                }}
+                className="h-9 border-gray-300 hover:bg-gray-100"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAssignTagsToPrompt}
+                className="h-9 bg-black hover:bg-black/90 text-white"
+              >
+                <Tag className="w-4 h-4 mr-2" />
+                Save Tags
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Dialog */}
+      <Dialog 
+        open={confirmDialog.open} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmDialog({ ...confirmDialog, open: false });
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[425px] gap-0 p-0 bg-white">
+          <DialogHeader className="px-6 pt-6 pb-4 bg-white">
+            <DialogTitle className="text-lg font-semibold text-black">
+              {confirmDialog.title}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="px-6 pb-6 bg-white">
+            <p className="text-sm text-gray-600 leading-relaxed">
+              {confirmDialog.description}
+            </p>
+          </div>
+          <DialogFooter className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDialog({ ...confirmDialog, open: false })}
+              className="h-9 border-gray-300 hover:bg-gray-100"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                confirmDialog.onConfirm();
+                setConfirmDialog({ ...confirmDialog, open: false });
+              }}
+              className="h-9 bg-black hover:bg-black/90 text-white"
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

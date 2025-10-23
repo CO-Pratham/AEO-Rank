@@ -792,7 +792,7 @@ const CompetitorsPage = () => {
                       </h3>
                       {competitor.domain && (
                         <p className="text-xs text-blue-600 dark:text-blue-400 font-medium truncate max-w-full px-2">
-                          {competitor.domain}
+                          www.{competitor.domain.replace(/^https?:\/\//i, '').replace(/^www\./i, '')}
                         </p>
                       )}
                       <p className="text-sm text-muted-foreground font-medium">
@@ -910,7 +910,10 @@ const CompetitorsPage = () => {
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground truncate">
-                          {competitor.website || "No website"}
+                          {competitor.website 
+                            ? `www.${competitor.website.replace(/^https?:\/\//i, '').replace(/^www\./i, '')}`
+                            : "No website"
+                          }
                         </p>
                       </div>
                     </div>
@@ -965,101 +968,76 @@ const CompetitorsPage = () => {
 
       {/* Add Competitor Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="max-w-2xl border-0 shadow-2xl p-0 gap-0 overflow-hidden">
-          {/* Header with gradient background */}
-          <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 px-8 py-8">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
+    <DialogContent className="max-w-lg p-0 gap-0 bg-white">
+      {/* Header */}
+      <DialogHeader className="px-6 pt-6 pb-4 border-b bg-white">
+        <DialogTitle className="text-xl font-semibold text-black">
+          Add New Competitor
+        </DialogTitle>
+        <p className="text-sm text-gray-600 mt-1">
+          Track and analyze your competitor's performance
+        </p>
+      </DialogHeader>
 
-            <DialogHeader className="relative space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <DialogTitle className="text-2xl font-bold text-white">
-                    Add New Competitor
-                  </DialogTitle>
-                  <p className="text-sm text-blue-100 mt-1">
-                    Track and analyze your competitor's performance
-                  </p>
-                </div>
-              </div>
-            </DialogHeader>
+      {/* Form Content */}
+      <div className="px-6 py-6 bg-white">
+        <div className="space-y-6">
+          {/* Competitor Name Field */}
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-sm font-semibold text-black">
+              Competitor Name
+              <span className="text-red-600 ml-1">*</span>
+            </Label>
+            <Input
+              id="name"
+              placeholder="e.g., Acme Corporation"
+              value={newCompetitorName}
+              onChange={(e) => setNewCompetitorName(e.target.value)}
+              className="h-9 border-gray-300 focus:border-black focus:ring-black"
+            />
+            <p className="text-xs text-gray-600">
+              Enter the official name of the competitor brand
+            </p>
           </div>
 
-          {/* Form Content */}
-          <div className="px-8 py-6 bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-900/50 dark:to-gray-950">
-            <div className="space-y-6">
-              {/* Competitor Name Field */}
-              <div className="space-y-2.5">
-                <Label
-                  htmlFor="name"
-                  className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2"
-                >
-                  <Building2 className="w-4 h-4 text-blue-600" />
-                  Competitor Name
-                  <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="name"
-                    placeholder="e.g., Acme Corporation"
-                    value={newCompetitorName}
-                    onChange={(e) => setNewCompetitorName(e.target.value)}
-                    className="h-12 pl-11 pr-4 text-base border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 rounded-xl"
-                  />
-                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 pl-1">
-                  <span className="w-1 h-1 rounded-full bg-blue-500"></span>
-                  Enter the official name of the competitor brand
-                </p>
-              </div>
+          {/* Website Domain Field */}
+          <div className="space-y-2">
+            <Label htmlFor="domain" className="text-sm font-semibold text-black">
+              Website Domain
+              <span className="text-red-600 ml-1">*</span>
+            </Label>
+            <Input
+              id="domain"
+              placeholder="e.g., example.com"
+              value={newCompetitorDomain}
+              onChange={(e) => {
+                // Auto-clean the domain - remove http://, https://, and www.
+                let cleanValue = e.target.value.trim();
+                cleanValue = cleanValue.replace(/^https?:\/\//i, '');
+                cleanValue = cleanValue.replace(/^www\./i, '');
+                cleanValue = cleanValue.split('/')[0]; // Remove any path after domain
+                setNewCompetitorDomain(cleanValue);
+              }}
+              className="h-9 border-gray-300 focus:border-black focus:ring-black"
+            />
+            <p className="text-xs text-gray-600">
+              Enter the domain without http:// or www. prefix
+            </p>
+          </div>
 
-              {/* Website Domain Field */}
-              <div className="space-y-2.5">
-                <Label
-                  htmlFor="domain"
-                  className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2"
-                >
-                  <Globe className="w-4 h-4 text-green-600" />
-                  Website Domain
-                  <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="domain"
-                    placeholder="e.g., example.com"
-                    value={newCompetitorDomain}
-                    onChange={(e) => setNewCompetitorDomain(e.target.value)}
-                    className="h-12 pl-11 pr-4 text-base border-2 border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all duration-200 rounded-xl"
-                  />
-                  <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 pl-1">
-                  <span className="w-1 h-1 rounded-full bg-green-500"></span>
-                  Enter the domain without http:// or www. prefix
-                </p>
-              </div>
-
-              {/* Country Field */}
-              <div className="space-y-2.5">
-                <Label
-                  htmlFor="country"
-                  className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2"
-                >
-                  <MapPin className="w-4 h-4 text-purple-600" />
-                  Country
-                  <span className="text-xs font-normal text-gray-500">
-                    (Optional)
-                  </span>
-                </Label>
+          {/* Country Field */}
+          <div className="space-y-2">
+            <Label htmlFor="country" className="text-sm font-semibold text-black">
+              Country
+              <span className="text-xs font-normal text-gray-600 ml-1">
+                (Optional)
+              </span>
+            </Label>
                 <Select
                   value={newCompetitorCountry}
                   onValueChange={setNewCompetitorCountry}
                 >
-                  <SelectTrigger className="h-12 text-base border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all duration-200 rounded-xl">
+                  <SelectTrigger id="country" className="h-9">
                     <SelectValue placeholder="Select country">
                       {newCompetitorCountry && (
                         <div className="flex items-center gap-2.5">
@@ -1122,17 +1100,16 @@ const CompetitorsPage = () => {
                     </SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 pl-1">
-                  <span className="w-1 h-1 rounded-full bg-purple-500"></span>
+                <p className="text-xs text-gray-600">
                   Select the country where the competitor is based
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Footer with gradient border */}
-          <div className="px-8 py-6 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800">
-            <DialogFooter className="gap-3 sm:gap-3">
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <DialogFooter className="gap-2">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -1141,13 +1118,13 @@ const CompetitorsPage = () => {
                   setNewCompetitorDomain("");
                   setNewCompetitorCountry("");
                 }}
-                className="h-11 px-6 rounded-xl border-2 hover:bg-gray-50 dark:hover:bg-gray-900 transition-all duration-200 font-medium"
+                className="h-9 border-gray-300 hover:bg-gray-100"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleAddCompetitor}
-                className="h-11 px-8 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all duration-200 font-semibold"
+                className="h-9 bg-black hover:bg-black/90 text-white"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Competitor
@@ -1189,15 +1166,17 @@ const CompetitorsPage = () => {
         open={viewDetailsDialogOpen}
         onOpenChange={setViewDetailsDialogOpen}
       >
-        <DialogContent className="max-w-2xl">
-          <DialogHeader className="pb-6">
+        <DialogContent className="max-w-3xl p-0 gap-0 bg-white">
+          {/* Header */}
+          <DialogHeader className="px-6 pt-6 pb-5 border-b bg-white">
             <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-xl flex items-center justify-center text-white font-bold flex-shrink-0">
+              {/* Logo */}
+              <div className="w-16 h-16 rounded-xl bg-black flex items-center justify-center text-white font-bold flex-shrink-0 border-2 border-gray-200">
                 {selectedCompetitor?.logo ? (
                   <img
                     src={selectedCompetitor.logo}
                     alt={selectedCompetitor.name}
-                    className="w-12 h-12 rounded-xl object-cover"
+                    className="w-14 h-14 rounded-lg object-cover"
                     onError={(e) => {
                       e.currentTarget.style.display = "none";
                       const fallback = e.currentTarget
@@ -1216,22 +1195,24 @@ const CompetitorsPage = () => {
                     generateInitials(selectedCompetitor.name)}
                 </span>
               </div>
+              
+              {/* Title & Badge */}
               <div className="flex-1">
-                <DialogTitle className="text-2xl font-bold mb-2">
+                <DialogTitle className="text-2xl font-bold text-black mb-2">
                   {selectedCompetitor?.name}
                 </DialogTitle>
                 <div className="flex items-center gap-2">
                   {selectedCompetitor?.isYourBrand ? (
                     <Badge
                       variant="secondary"
-                      className="bg-orange-100 text-orange-700 border-0 font-semibold"
+                      className="bg-black text-white border-0 font-semibold px-3 py-1"
                     >
                       Your Brand
                     </Badge>
                   ) : (
                     <Badge
                       variant="outline"
-                      className="border-border/50 font-semibold bg-blue-50 text-blue-700 border-blue-200"
+                      className="border-gray-300 font-semibold bg-gray-50 text-gray-700 px-3 py-1"
                     >
                       Competitor
                     </Badge>
@@ -1241,92 +1222,123 @@ const CompetitorsPage = () => {
             </div>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-4 py-2">
-            {/* Website */}
-            <div className="bg-gradient-to-br from-blue-50/50 to-cyan-50/30 rounded-xl p-4 border border-blue-100">
-              <label className="text-xs font-semibold text-blue-700 uppercase tracking-wide flex items-center gap-2 mb-3">
-                <Globe className="w-4 h-4" />
-                Website
-              </label>
-              <a
-                href={`https://${selectedCompetitor?.website}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1.5 break-all"
-              >
-                {selectedCompetitor?.website}
-                <ExternalLink className="w-4 h-4 flex-shrink-0" />
-              </a>
-            </div>
+          {/* Content */}
+          <div className="px-6 py-6 bg-white">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              {/* Website */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-gray-300 transition-colors">
+                <div className="flex items-center gap-2 mb-3">
+                  <Globe className="w-4 h-4 text-gray-700" />
+                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                    Website
+                  </label>
+                </div>
+                <a
+                  href={(() => {
+                    const website = selectedCompetitor?.website || '';
+                    const cleanDomain = website
+                      .replace(/^https?:\/\//i, '')
+                      .replace(/^www\./i, '');
+                    return `https://www.${cleanDomain}`;
+                  })()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium text-black hover:underline flex items-center gap-2 break-all group"
+                >
+                  <span>
+                    {(() => {
+                      const website = selectedCompetitor?.website || '';
+                      const cleanDomain = website
+                        .replace(/^https?:\/\//i, '')
+                        .replace(/^www\./i, '');
+                      return `www.${cleanDomain}`;
+                    })()}
+                  </span>
+                  <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 text-gray-500 group-hover:text-black" />
+                </a>
+              </div>
 
-            {/* Tracking Status */}
-            <div className="bg-gradient-to-br from-green-50/50 to-emerald-50/30 rounded-xl p-4 border border-green-100">
-              <label className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-2 mb-3">
-                <Eye className="w-4 h-4" />
-                Tracking Status
-              </label>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                <p className="text-sm text-foreground font-semibold">
-                  Active Monitoring
-                </p>
+              {/* Tracking Status */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <Eye className="w-4 h-4 text-gray-700" />
+                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                    Status
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                  <p className="text-sm text-black font-medium">
+                    Active Monitoring
+                  </p>
+                </div>
+              </div>
+
+              {/* Visibility */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <Eye className="w-4 h-4 text-gray-700" />
+                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                    Visibility
+                  </label>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-black">
+                    {selectedCompetitor?.isYourBrand ? "N/A" : "0%"}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Across all AI models
+                  </p>
+                </div>
+              </div>
+
+              {/* Date Added */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <Building2 className="w-4 h-4 text-gray-700" />
+                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                    Added On
+                  </label>
+                </div>
+                <div>
+                  <p className="text-sm text-black font-medium">
+                    {new Date().toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Recently added
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Visibility */}
-            <div className="bg-gradient-to-br from-purple-50/50 to-pink-50/30 rounded-xl p-4 border border-purple-100">
-              <label className="text-xs font-semibold text-purple-700 uppercase tracking-wide flex items-center gap-2 mb-3">
-                <Eye className="w-4 h-4" />
-                Visibility
+            {/* Description */}
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <label className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3 block">
+                About
               </label>
-              <p className="text-2xl font-bold text-purple-600">
-                {selectedCompetitor?.isYourBrand ? "N/A" : "0%"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Across all models
-              </p>
-            </div>
-
-            {/* Date Added */}
-            <div className="bg-gradient-to-br from-orange-50/50 to-amber-50/30 rounded-xl p-4 border border-orange-100">
-              <label className="text-xs font-semibold text-orange-700 uppercase tracking-wide flex items-center gap-2 mb-3">
-                <Building2 className="w-4 h-4" />
-                Date Added
-              </label>
-              <p className="text-sm text-foreground font-semibold">
-                {new Date().toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Recently added
+              <p className="text-sm text-gray-700 leading-relaxed">
+                This competitor is being tracked across all AI models and platforms. 
+                Monitor their visibility and performance in real-time to stay ahead of the competition.
               </p>
             </div>
           </div>
 
-          {/* Additional Info */}
-          <div className="bg-muted/30 rounded-xl p-4 border border-border/50 mt-4">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-              About
-            </label>
-            <p className="text-sm text-foreground">
-              This competitor is being tracked across all AI models and
-              platforms. Monitor their visibility and performance in real-time.
-            </p>
-          </div>
-
-          <DialogFooter className="pt-4 gap-2">
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-3">
             <Button
               variant="outline"
               onClick={() => setViewDetailsDialogOpen(false)}
-              className="h-10 px-6 rounded-lg"
+              className="h-10 px-6 border-gray-300 hover:bg-gray-100"
             >
               Close
             </Button>
             <Button
-              className="h-10 px-6 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+              className="h-10 px-6 bg-black hover:bg-gray-800 text-white"
               onClick={() => {
                 setViewDetailsDialogOpen(false);
                 navigate("/dashboard/ranking");
@@ -1334,7 +1346,7 @@ const CompetitorsPage = () => {
             >
               View Rankings
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

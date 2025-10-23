@@ -167,7 +167,9 @@ const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
                 {(brand?.website || brand?.domain) && (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Globe className="w-3 h-3 flex-shrink-0" />
-                    <span className="truncate">{brand.website || brand.domain}</span>
+                    <span className="truncate">
+                      www.{(brand.website || brand.domain || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '')}
+                    </span>
                   </div>
                 )}
                 {(brand?.location || brand?.country) && (

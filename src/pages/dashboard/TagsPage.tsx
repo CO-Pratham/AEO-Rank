@@ -213,14 +213,9 @@ const TagsPage = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-xl">
-            <TagIcon className="w-8 h-8 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Tags</h1>
-            <p className="text-muted-foreground">Organize and track your content with tags</p>
-          </div>
+        <div className="flex items-center gap-2.5">
+          <TagIcon className="w-5 h-5 text-muted-foreground" />
+          <h1 className="text-2xl font-semibold text-foreground">Tags</h1>
         </div>
         <Button 
           onClick={() => setIsCreateDialogOpen(true)}
@@ -322,65 +317,60 @@ const TagsPage = () => {
 
       {/* Create Tag Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden">
-          {/* Header with gradient */}
-          <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 px-6 py-5 text-white">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                <Sparkles className="w-5 h-5" />
-                Create New Tag
-              </DialogTitle>
-              <DialogDescription className="text-white/90 text-sm">
-                Add a new tag to organize your content and prompts
-              </DialogDescription>
-            </DialogHeader>
-          </div>
-          
-          {/* Form Content */}
-          <div className="px-6 py-5 space-y-5">
-            <div className="space-y-3">
-              <Label htmlFor="name" className="text-sm font-semibold flex items-center gap-2">
-                <TagIcon className="w-4 h-4 text-blue-600" />
-                Tag Name
-              </Label>
-              <Input
-                id="name"
-                placeholder="e.g. Marketing, Development, Important"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="h-11 border-2 focus:border-blue-500 transition-all"
-              />
-            </div>
-            
-            <div className="space-y-3">
-              <Label htmlFor="color" className="text-sm font-semibold flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500"></div>
-                Color
-              </Label>
+      <DialogContent className="sm:max-w-[500px] p-0 gap-0 bg-white">
+      {/* Header */}
+      <DialogHeader className="px-6 pt-6 pb-4 border-b bg-white">
+        <DialogTitle className="text-xl font-semibold text-black">
+          Create New Tag
+        </DialogTitle>
+        <p className="text-sm text-gray-600 mt-1">
+          Add a new tag to organize your content and prompts
+        </p>
+      </DialogHeader>
+      
+      {/* Form Content */}
+      <div className="px-6 py-6 space-y-5 bg-white">
+        <div className="space-y-2">
+          <Label htmlFor="name" className="text-sm font-semibold text-black">
+            Tag Name
+          </Label>
+          <Input
+            id="name"
+            placeholder="e.g. Marketing, Development, Important"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            className="h-9 border-gray-300 focus:border-black focus:ring-black"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="color" className="text-sm font-semibold text-black">
+            Color
+          </Label>
               <Select
                 value={formData.color}
                 onValueChange={(value) => setFormData({ ...formData, color: value })}
               >
-                <SelectTrigger id="color" className="h-11 border-2">
+                <SelectTrigger id="color" className="h-9">
                   <SelectValue>
                     <div className="flex items-center gap-2">
                       <div 
-                        className="w-5 h-5 rounded-full border-2 border-white shadow-md" 
+                        className="w-4 h-4 rounded-full border" 
                         style={{ backgroundColor: formData.color }}
                       />
-                      <span className="font-medium">{TAG_COLORS.find(c => c.value === formData.color)?.name || "Custom"}</span>
+                      <span>{TAG_COLORS.find(c => c.value === formData.color)?.name || "Custom"}</span>
                     </div>
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent className="bg-white">
+                <SelectContent>
                   {TAG_COLORS.map((color) => (
-                    <SelectItem key={color.value} value={color.value} className="cursor-pointer">
-                      <div className="flex items-center gap-3 py-1">
+                    <SelectItem key={color.value} value={color.value}>
+                      <div className="flex items-center gap-2">
                         <div 
-                          className="w-6 h-6 rounded-full border-2 border-gray-200 shadow-sm" 
+                          className="w-4 h-4 rounded-full border" 
                           style={{ backgroundColor: color.value }}
                         />
-                        <span className="font-medium">{color.name}</span>
+                        <span>{color.name}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -388,19 +378,18 @@ const TagsPage = () => {
               </Select>
             </div>
             
-            <div className="space-y-3">
-              <Label className="text-sm font-semibold flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-blue-600" />
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-black">
                 Associate with Prompts
-                <span className="text-xs font-normal text-gray-500">(Optional)</span>
+                <span className="text-xs font-normal text-gray-600 ml-1">(Optional)</span>
               </Label>
-              <div className="border-2 border-gray-200 rounded-lg max-h-[250px] overflow-y-auto">
+              <div className="border border-gray-200 rounded-lg max-h-[250px] overflow-y-auto">
                 {availablePrompts.length > 0 ? (
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-gray-200">
                     {availablePrompts.map((prompt) => (
                       <div 
                         key={prompt.id}
-                        className="flex items-start gap-3 p-3 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors cursor-pointer"
+                        className="flex items-start gap-3 p-3 hover:bg-gray-50 transition-colors cursor-pointer"
                         onClick={() => {
                           setSelectedPromptIds(prev => 
                             prev.includes(prompt.id) 
@@ -421,13 +410,13 @@ const TagsPage = () => {
                           className="mt-1"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2">
+                          <p className="text-sm font-medium text-black line-clamp-2">
                             {prompt.prompt || prompt.query || 'Unnamed prompt'}
                           </p>
                           {prompt.tags && prompt.tags.length > 0 && (
                             <div className="flex items-center gap-1 mt-1 flex-wrap">
                               {prompt.tags.slice(0, 3).map((tag: string, idx: number) => (
-                                <Badge key={idx} variant="secondary" className="text-[10px] px-2 py-0.5">
+                                <Badge key={idx} variant="secondary" className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-700">
                                   {tag}
                                 </Badge>
                               ))}
@@ -438,27 +427,27 @@ const TagsPage = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="p-6 text-center text-sm text-gray-500">
+                  <div className="p-6 text-center text-sm text-gray-600">
                     No prompts available. Create prompts first to associate them with tags.
                   </div>
                 )}
               </div>
               {selectedPromptIds.length > 0 && (
-                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                <p className="text-xs text-gray-600">
                   {selectedPromptIds.length} prompt(s) selected
                 </p>
               )}
             </div>
             
             {/* Preview */}
-            <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border-2 border-blue-100">
-              <p className="text-xs font-semibold text-gray-600 mb-2">Preview:</p>
+            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-xs text-gray-700 font-semibold mb-2">Preview:</p>
               <Badge 
-                className="text-sm px-4 py-2 font-medium shadow-sm"
+                className="text-sm px-3 py-1"
                 style={{ 
                   backgroundColor: formData.color + '20',
                   color: formData.color,
-                  border: `2px solid ${formData.color}40`
+                  border: `1px solid ${formData.color}40`
                 }}
               >
                 {formData.name || "Tag Name"}
@@ -467,26 +456,28 @@ const TagsPage = () => {
           </div>
           
           {/* Footer */}
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setIsCreateDialogOpen(false);
-                setFormData({ name: "", color: "#3b82f6", description: "" });
-                setSelectedPromptIds([]);
-              }}
-              className="h-10 px-6"
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleCreateTag} 
-              disabled={!formData.name}
-              className="h-10 px-6 bg-black hover:bg-gray-800 text-white"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create Tag
-            </Button>
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <DialogFooter className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setIsCreateDialogOpen(false);
+                  setFormData({ name: "", color: "#3b82f6", description: "" });
+                  setSelectedPromptIds([]);
+                }}
+                className="h-9 border-gray-300 hover:bg-gray-100"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleCreateTag} 
+                disabled={!formData.name}
+                className="h-9 bg-black hover:bg-black/90 text-white"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Tag
+              </Button>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>

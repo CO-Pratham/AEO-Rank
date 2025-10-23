@@ -133,7 +133,7 @@ const DashboardSidebar = ({ collapsed, onToggle }: DashboardSidebarProps) => {
               to="/"
               className="flex items-center justify-center mx-auto"
             >
-              <img src="/aeorank.jpeg" alt="AEORank" className="w-8 h-8 rounded-sm object-cover" />
+              <img src="/AEO-Rank.jpeg" alt="AEORank" className="w-8 h-8 rounded-sm object-cover" />
             </Link>
           )}
         </div>

@@ -568,11 +568,16 @@ const OnboardingWizard = ({
                 </Label>
                 <Input
                   id="brandWebsite"
-                  placeholder="https://example.com"
+                  placeholder="example.com (no need for http:// or www.)"
                   value={formData.brandWebsite}
-                  onChange={(e) =>
-                    dispatch(updateOnboardingData({ brandWebsite: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    // Auto-clean the domain - remove http://, https://, and www.
+                    let cleanValue = e.target.value.trim();
+                    cleanValue = cleanValue.replace(/^https?:\/\//i, '');
+                    cleanValue = cleanValue.replace(/^www\./i, '');
+                    cleanValue = cleanValue.split('/')[0]; // Remove any path after domain
+                    dispatch(updateOnboardingData({ brandWebsite: cleanValue }));
+                  }}
                   className="h-12 border-2 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 hover:border-blue-400 transition-all duration-300 rounded-lg bg-white/80 dark:bg-gray-800/80"
                 />
               </div>
@@ -702,9 +707,16 @@ const OnboardingWizard = ({
                   />
                   <Input
                     id="competitor-domain"
-                    placeholder="branddomain.com"
+                    placeholder="example.com (no http:// or www.)"
                     value={tempCompetitorDomain}
-                    onChange={(e) => setTempCompetitorDomain(e.target.value)}
+                    onChange={(e) => {
+                      // Auto-clean the domain - remove http://, https://, and www.
+                      let cleanValue = e.target.value.trim();
+                      cleanValue = cleanValue.replace(/^https?:\/\//i, '');
+                      cleanValue = cleanValue.replace(/^www\./i, '');
+                      cleanValue = cleanValue.split('/')[0]; // Remove any path after domain
+                      setTempCompetitorDomain(cleanValue);
+                    }}
                     onKeyPress={(e) => {
                       if (
                         e.key === "Enter" &&
@@ -749,6 +761,10 @@ const OnboardingWizard = ({
                     formData.competitors.map((competitor, index) => {
                       const hasDomain = competitor.includes("||");
                       const [compName, compDomain] = hasDomain ? competitor.split("||") : [competitor, ""];
+                      // Clean and format domain for display
+                      const displayDomain = compDomain 
+                        ? `www.${compDomain.replace(/^https?:\/\//i, '').replace(/^www\./i, '')}`
+                        : '';
                       return (
                         <div key={index} className="flex items-center gap-2">
                           <Badge
@@ -757,8 +773,8 @@ const OnboardingWizard = ({
                           >
                             <div className="flex flex-col text-left">
                               <span className="leading-tight">{compName}</span>
-                              {compDomain ? (
-                                <span className="text-xs text-emerald-700 leading-tight">{compDomain}</span>
+                              {displayDomain ? (
+                                <span className="text-xs text-emerald-700 leading-tight">{displayDomain}</span>
                               ) : null}
                             </div>
                             <X
