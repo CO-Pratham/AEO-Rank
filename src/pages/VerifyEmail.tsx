@@ -80,7 +80,7 @@ const VerifyEmail = () => {
               localStorage.removeItem("aeorank_onboarding_completed");
               localStorage.removeItem("aeorank_onboarding_state");
             } catch {}
-            navigate("/onboarding?fresh=1", { replace: true });
+            navigate("/onboarding");
             return;
           }
 
@@ -91,7 +91,7 @@ const VerifyEmail = () => {
               localStorage.removeItem("aeorank_onboarding_completed");
               localStorage.removeItem("aeorank_onboarding_state");
             } catch {}
-            navigate("/onboarding?fresh=1", { replace: true });
+            navigate("/onboarding");
             return;
           }
 
@@ -102,7 +102,7 @@ const VerifyEmail = () => {
               localStorage.removeItem("aeorank_onboarding_completed");
               localStorage.removeItem("aeorank_onboarding_state");
             } catch {}
-            navigate("/onboarding?fresh=1", { replace: true });
+            navigate("/onboarding");
             return;
           }
 
@@ -115,7 +115,7 @@ const VerifyEmail = () => {
                 localStorage.removeItem("aeorank_onboarding_completed");
                 localStorage.removeItem("aeorank_onboarding_state");
               } catch {}
-              navigate("/onboarding?fresh=1", { replace: true });
+              navigate("/onboarding");
               return;
             }
 
@@ -142,7 +142,7 @@ const VerifyEmail = () => {
                 localStorage.removeItem("aeorank_onboarding_completed");
                 localStorage.removeItem("aeorank_onboarding_state");
               } catch {}
-              navigate("/onboarding?fresh=1", { replace: true });
+              navigate("/onboarding");
             }
           };
 
