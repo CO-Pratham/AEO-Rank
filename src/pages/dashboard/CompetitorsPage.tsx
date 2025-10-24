@@ -102,6 +102,16 @@ const CompetitorsPage = () => {
   const [viewDetailsDialogOpen, setViewDetailsDialogOpen] = useState(false);
   const [selectedCompetitor, setSelectedCompetitor] =
     useState<YourCompetitor | null>(null);
+  const [refreshingSuggestions, setRefreshingSuggestions] = useState(false);
+
+  // Function to clear suggested competitors cache
+  const clearSuggestedCompetitorsCache = () => {
+    if (brand) {
+      const cacheKey = `suggested_competitors_${brand.name || brand.brand_name}`;
+      localStorage.removeItem(cacheKey);
+      console.log("Cleared suggested competitors cache for brand:", brand.name || brand.brand_name);
+    }
+  };
 
   // Handle view details
   const handleViewDetails = (competitor: YourCompetitor) => {
@@ -435,100 +445,126 @@ const CompetitorsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
-  // Fetch suggested competitors from /competitor/generate API
-  useEffect(() => {
-    const fetchSuggestedCompetitors = async () => {
-      try {
-        const token = localStorage.getItem("accessToken");
+  // Function to fetch suggested competitors from API
+  const fetchSuggestedCompetitors = async () => {
+    try {
+      const token = localStorage.getItem("accessToken");
 
-        if (!token || !brand) {
-          console.log(
-            "No access token or brand data found for suggested competitors"
-          );
-          setSuggestedCompetitors([]);
-          return;
-        }
-
-        // Use real brand data from context
-        const response = await fetch(
-          "https://aeotest-production.up.railway.app/competitor/generate",
-         // "https://aeotest-production.up.railway.app/competitor/generate",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              brand_name: brand.name || brand.brand_name || "Sample Brand",
-              domain: brand.website || brand.domain || "example.com",
-              country: brand.location || brand.country || "US",
-            }),
-          }
+      if (!token || !brand) {
+        console.log(
+          "No access token or brand data found for suggested competitors"
         );
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch suggested competitors: ${response.status}`
-          );
-        }
-
-        const data = await response.json();
-        console.log("Suggested Competitors API Response:", data);
-
-        // Transform the API response to match our interface
-        const transformedData = Array.isArray(data)
-          ? data.map((item: any, index: number) => {
-              // Extract clean domain from provided data
-              let domain = item.domain || item.website || "";
-
-              // Clean domain: remove protocol, www, and trailing slashes
-              if (domain) {
-                domain = domain
-                  .replace(/^https?:\/\//i, "")
-                  .replace(/^www\./i, "")
-                  .replace(/\/.*$/, "");
-              }
-
-              // If no domain provided, construct from brand name
-              if (!domain) {
-                domain =
-                  (item.brand_name || item.name || `competitor${index + 1}`)
-                    .toLowerCase()
-                    .replace(/\s+/g, "") + ".com";
-              }
-
-              const brandName = item.brand_name ||
-                item.name ||
-                item.competitor ||
-                `Competitor ${index + 1}`;
-
-              return {
-                id: Date.now() + index,
-                name: brandName,
-                logo: getDomainLogo(domain, item.logo, brandName),
-                mentions:
-                  item.mentions || Math.floor(Math.random() * 1000) + 100,
-                domain: domain,
-                visibility: "0%",
-                sentiment: "—",
-                position: "—",
-              };
-            })
-          : [];
-
-        dispatch(setSuggestedCompetitors(transformedData));
-      } catch (err) {
-        console.error("Error fetching suggested competitors:", err);
         dispatch(setSuggestedCompetitors([]));
+        return;
       }
-    };
 
-    // Only fetch suggested competitors if we have brand data
-    if (brand) {
-      fetchSuggestedCompetitors();
+      // Check if we have cached suggested competitors
+      const cacheKey = `suggested_competitors_${brand.name || brand.brand_name}`;
+      const cachedData = localStorage.getItem(cacheKey);
+      
+      if (cachedData) {
+        try {
+          const parsedData = JSON.parse(cachedData);
+          console.log("Using cached suggested competitors:", parsedData);
+          
+          // Transform cached data to match our interface
+          const transformedData = parsedData.map((item: any, index: number) => ({
+            id: index + 1,
+            name: item.name || item.brand || item.competitor || `Competitor ${index + 1}`,
+            logo: getDomainLogo(item.url || item.domain || item.website, item.logo, item.name || item.brand),
+            domain: item.url || item.domain || item.website,
+            mentions: Math.floor(Math.random() * 100) + 10, // Random mentions for display
+          }));
+          
+          dispatch(setSuggestedCompetitors(transformedData));
+          return; // Use cached data, don't make API call
+        } catch (error) {
+          console.error("Error parsing cached suggested competitors:", error);
+          // Continue to API call if cache is corrupted
+        }
+      }
+
+      // Use real brand data from context
+      const response = await fetch(
+        "https://aeotest-production.up.railway.app/competitor/generate",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            brand_name: brand.name || brand.brand_name || "Sample Brand",
+            domain: brand.website || brand.domain || "example.com",
+            country: brand.location || brand.country || "US",
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch suggested competitors: ${response.status}`
+        );
+      }
+
+      const data = await response.json();
+      console.log("Suggested Competitors API Response:", data);
+      
+      // Cache the API response
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(data));
+        console.log("Cached suggested competitors for brand:", brand.name || brand.brand_name);
+      } catch (error) {
+        console.error("Error caching suggested competitors:", error);
+      }
+
+      // Transform the API response to match our interface
+      const transformedData = Array.isArray(data)
+        ? data.map((item: any, index: number) => {
+            // Extract clean domain from provided data
+            let domain = item.domain || item.website || "";
+
+            // Clean domain: remove protocol, www, and trailing slashes
+            if (domain) {
+              domain = domain
+                .replace(/^https?:\/\//i, "")
+                .replace(/^www\./i, "")
+                .replace(/\/.*$/, "");
+            }
+
+            // If no domain provided, construct from brand name
+            if (!domain) {
+              domain =
+                (item.brand_name || item.name || `competitor${index + 1}`)
+                  .toLowerCase()
+                  .replace(/\s+/g, "") + ".com";
+            }
+
+            const brandName = item.brand_name ||
+              item.name ||
+              item.competitor ||
+              `Competitor ${index + 1}`;
+
+            return {
+              id: Date.now() + index,
+              name: brandName,
+              logo: getDomainLogo(domain, item.logo, brandName),
+              mentions:
+                item.mentions || Math.floor(Math.random() * 1000) + 100,
+              domain: domain,
+              visibility: "0%",
+              sentiment: "—",
+              position: "—",
+            };
+          })
+        : [];
+
+      dispatch(setSuggestedCompetitors(transformedData));
+    } catch (err) {
+      console.error("Error fetching suggested competitors:", err);
+      dispatch(setSuggestedCompetitors([]));
     }
-  }, [brand, dispatch]);
+  };
 
   // Use existing competitors from API instead of context
   const yourCompetitors: YourCompetitor[] =
@@ -795,9 +831,39 @@ const CompetitorsPage = () => {
 
       {/* Suggested Competitors */}
       <div className="space-y-4">
-        <h2 className="text-base font-medium text-foreground">
-          Suggested Competitors
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-medium text-foreground">
+            Suggested Competitors
+          </h2>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={refreshingSuggestions}
+            onClick={async () => {
+              setRefreshingSuggestions(true);
+              try {
+                clearSuggestedCompetitorsCache();
+                // Call the API function to fetch fresh suggested competitors
+                await fetchSuggestedCompetitors();
+              } finally {
+                setRefreshingSuggestions(false);
+              }
+            }}
+            className="h-8 px-3 text-xs"
+          >
+            {refreshingSuggestions ? (
+              <>
+                <div className="w-3 h-3 mr-1 border border-gray-300 border-t-transparent rounded-full animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3 h-3 mr-1" />
+                Suggest More
+              </>
+            )}
+          </Button>
+        </div>
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, index) => (
@@ -822,8 +888,7 @@ const CompetitorsPage = () => {
           <Card className="border border-border/50">
             <CardContent className="p-8 text-center">
               <p className="text-muted-foreground">
-                No suggested competitors available. Try refreshing or check your
-                brand settings.
+                No suggested competitors available. Click "Suggest More" to get AI-powered competitor suggestions.
               </p>
             </CardContent>
           </Card>
