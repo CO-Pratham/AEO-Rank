@@ -1,42 +1,13 @@
-import { useState, useEffect } from "react";
-import { Navigate, Outlet } from "react-router-dom";
+import { useState } from "react";
+import { Outlet } from "react-router-dom";
 import DashboardSidebar from "./DashboardSidebar";
 
 const DashboardLayout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Check if user is authenticated
-    const token = localStorage.getItem("accessToken");
-    const onboardingCompleted = localStorage.getItem("aeorank_onboarding_completed");
-    setIsAuthenticated(!!(token && onboardingCompleted));
-    setLoading(false);
-  }, []);
 
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <img src="/AEO-Rank.jpeg" alt="AEO Rank Logo" className="w-8 h-8 rounded-sm object-cover animate-pulse" />
-          <span className="text-lg font-bold text-foreground">Loading...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    const token = localStorage.getItem("accessToken");
-    if (token && !localStorage.getItem("aeorank_onboarding_completed")) {
-      return <Navigate to="/onboarding" replace />;
-    }
-    return <Navigate to="/signup" replace />;
-  }
 
   return (
     <div className="min-h-screen bg-background">

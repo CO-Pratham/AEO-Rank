@@ -8,6 +8,7 @@ import { CompetitorsProvider } from "@/context/CompetitorsContext";
 import { SourcesProvider } from "@/context/SourcesContext";
 import { WorkspaceProvider } from "@/context/WorkspaceContext";
 import { BrandProvider } from "@/context/BrandContext";
+import AuthGuard from "@/components/AuthGuard";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -87,7 +88,14 @@ const App = () => (
                     />
                     <Route path="/contact" element={<Contact />} />
                     <Route path="/best-practices" element={<BestPractices />} />
-                    <Route path="/dashboard" element={<DashboardLayout />}>
+                    <Route 
+                      path="/dashboard" 
+                      element={
+                        <AuthGuard>
+                          <DashboardLayout />
+                        </AuthGuard>
+                      }
+                    >
                       <Route index element={<DashboardOverview />} />
                       <Route path="ranking" element={<RankingPage />} />
                       <Route path="prompts" element={<PromptsPage />} />
