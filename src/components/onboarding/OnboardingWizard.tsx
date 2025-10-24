@@ -113,7 +113,7 @@ const OnboardingWizard = ({
 
       setLoadingCompetitors(true);
       try {
-        const response = await apiCall("/competitor/gen", {
+        const response = await apiCall("/competitor/generate", {
           method: "POST",
           body: JSON.stringify({
             brand_name: formData.brandName,
@@ -178,7 +178,7 @@ const OnboardingWizard = ({
         console.log('Domain:', formData.brandWebsite);
         console.log('User has navigated to step 3:', hasUserNavigatedToStep3);
 
-        const response = await apiCall(`/prompts/gen`, {
+        const response = await apiCall(`/prompts/generate`, {
           method: "POST",
           body: JSON.stringify({
             domain: formData.brandWebsite

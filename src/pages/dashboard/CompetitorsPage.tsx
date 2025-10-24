@@ -451,7 +451,7 @@ const CompetitorsPage = () => {
 
         // Use real brand data from context
         const response = await fetch(
-          "https://aeotest-production.up.railway.app/competitor/geerate",
+          "https://aeotest-production.up.railway.app/competitor/generate",
          // "https://aeotest-production.up.railway.app/competitor/generate",
           {
             method: "POST",
