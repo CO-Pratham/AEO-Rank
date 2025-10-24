@@ -50,6 +50,7 @@ interface PromptsState {
   loading: boolean;
   detailLoading: boolean;
   isAddingPrompt: boolean;
+  isGeneratingSuggestions: boolean;
   error: string | null;
   selectedPromptIds: number[];
   selectedInactiveIds: number[];
@@ -63,6 +64,7 @@ const initialState: PromptsState = {
   loading: false,
   detailLoading: false,
   isAddingPrompt: false,
+  isGeneratingSuggestions: false,
   error: null,
   selectedPromptIds: [],
   selectedInactiveIds: [],
@@ -401,6 +403,42 @@ export const activatePrompts = createAsyncThunk(
   }
 );
 
+export const fetchSuggestedPrompts = createAsyncThunk(
+  'prompts/fetchSuggested',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch(
+        "https://aeotest-production.up.railway.app/prompts/generate",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          mode: "cors",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch suggested prompts: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const processedPrompts = Array.isArray(data)
+        ? data.map((item: any) => ({
+            ...processPromptData(item),
+            suggestedAt: item.suggestedAt || new Date().toISOString(),
+          }))
+        : [];
+
+      return processedPrompts;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 const promptsSlice = createSlice({
   name: 'prompts',
   initialState,
@@ -534,6 +572,22 @@ const promptsSlice = createSlice({
         state.activePrompts.push(...promptsToMove);
         state.inactivePrompts = state.inactivePrompts.filter(p => !promptIds.includes(p.id));
         state.selectedInactiveIds = [];
+      });
+
+    // Fetch Suggested Prompts
+    builder
+      .addCase(fetchSuggestedPrompts.pending, (state) => {
+        state.isGeneratingSuggestions = true;
+        state.error = null;
+      })
+      .addCase(fetchSuggestedPrompts.fulfilled, (state, action) => {
+        state.isGeneratingSuggestions = false;
+        // Append new suggestions to existing ones instead of replacing
+        state.suggestedPrompts.push(...action.payload);
+      })
+      .addCase(fetchSuggestedPrompts.rejected, (state, action) => {
+        state.isGeneratingSuggestions = false;
+        state.error = action.payload as string;
       });
   },
 });

@@ -33,17 +33,21 @@ const Onboarding = () => {
       dispatch(resetOnboarding());
       return;
     }
-    if (isCompleted) {
+    
+    // Only redirect if onboarding was completed in a previous session
+    // Don't redirect if we just completed it in this session
+    if (isCompleted && !searchParams.get("justCompleted")) {
       navigate("/dashboard", { replace: true });
     }
   }, [isCompleted, navigate, dispatch, searchParams, isAuthenticated, loading]);
 
   const handleOnboardingComplete = (data: any) => {
     console.log("Onboarding completed with data:", data);
+    
+    // Set completion flag
     dispatch(completeOnboarding());
-    try {
-      localStorage.setItem("aeorank_onboarding_completed", "true");
-    } catch {}
+    
+    // Navigate to dashboard immediately
     navigate("/dashboard", { replace: true });
   };
 
@@ -53,10 +57,10 @@ const Onboarding = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <img src="/AEO-Rank.jpeg" alt="AEO Rank Logo" className="w-8 h-8 rounded-sm object-cover animate-pulse" />
-          <span className="text-lg font-bold text-foreground">Loading...</span>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="flex items-center space-x-3">
+          <img src="/AEO-Rank.jpeg" alt="AEO Rank Logo" className="w-10 h-10 rounded object-cover animate-pulse" />
+          <span className="text-xl font-semibold text-gray-900 dark:text-white">Loading...</span>
         </div>
       </div>
     );
@@ -67,13 +71,11 @@ const Onboarding = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <OnboardingWizard
-        isOpen={!isCompleted || searchParams.get("fresh") === "1"}
-        onClose={handleClose}
-        onComplete={handleOnboardingComplete}
-      />
-    </div>
+    <OnboardingWizard
+      isOpen={!isCompleted || searchParams.get("fresh") === "1"}
+      onClose={handleClose}
+      onComplete={handleOnboardingComplete}
+    />
   );
 };
 

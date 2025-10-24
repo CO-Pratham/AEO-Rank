@@ -10,6 +10,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { PricingPopup } from "@/components/ui/pricing-popup";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { useBrand } from "@/context/BrandContext";
 import { useNavigate } from "react-router-dom";
@@ -26,6 +27,7 @@ const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [showProLock, setShowProLock] = useState(false);
+  const [showPricingPopup, setShowPricingPopup] = useState(false);
 
   // Debug logging
   console.log('WorkspaceDropdown - brand:', brand);
@@ -244,7 +246,7 @@ const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
         
         {/* Always show Pro-gated New Workspace entry */}
         <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Pro</div>
-        <DropdownMenuItem onClick={() => navigate('/dashboard/workspace?locked=1')} className="cursor-pointer opacity-80">
+        <DropdownMenuItem onClick={() => setShowPricingPopup(true)} className="cursor-pointer opacity-80">
           <div className="flex items-center gap-2 w-full">
             <Lock className="w-4 h-4" />
             <span>New Workspace</span>
@@ -284,6 +286,12 @@ const WorkspaceDropdown = ({ user, onLogout }: WorkspaceDropdownProps) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Pricing Popup */}
+      <PricingPopup
+        isOpen={showPricingPopup}
+        onClose={() => setShowPricingPopup(false)}
+      />
     </DropdownMenu>
   );
 };

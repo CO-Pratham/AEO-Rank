@@ -36,11 +36,14 @@ export const BrandProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
 
       if (!response.ok) {
+        // If it's a 404 or other error, stop loading immediately
+        console.log('❌ /me endpoint failed with status:', response.status);
+        setLoading(false);
         throw new Error("Failed to fetch user data");
       }
 
       const data = await response.json();
-      console.log('User data from /me API:', data);
+      console.log('✅ User data from /me API (200):', data);
 
       // Transform API response to match our Brand interface
       if (data && data.brand_name) {
@@ -56,9 +59,11 @@ export const BrandProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setBrand(brandData);
         console.log('✅ Brand data set:', brandData);
       } else {
-        console.log('❌ No brand_name found in /me response');
+        console.log('⚠️ No brand_name found in /me response, setting null');
         setBrand(null);
       }
+      // Explicitly stop loading after successful response
+      setLoading(false);
     } catch (err) {
       console.error('Error fetching brand data from /me:', err);
 
@@ -71,7 +76,7 @@ export const BrandProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         if (fallbackResponse.ok) {
           const fallbackData = await fallbackResponse.json();
-          console.log('Fallback brand data from /user/brand:', fallbackData);
+          console.log('✅ Fallback brand data from /user/brand (200):', fallbackData);
 
           if (fallbackData && (fallbackData.brand_name || fallbackData.name)) {
             const brandData: Brand = {
@@ -86,18 +91,22 @@ export const BrandProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             setBrand(brandData);
             console.log('✅ Fallback brand data set:', brandData);
           } else {
+            console.log('⚠️ No brand data in fallback response');
             setBrand(null);
           }
         } else {
-          throw new Error("Both /me and /user/brand endpoints failed");
+          console.log('❌ Fallback endpoint also failed');
+          setError("Unable to load brand data");
+          setBrand(null);
         }
       } catch (fallbackErr) {
-        console.error('Both endpoints failed:', fallbackErr);
+        console.error('❌ Both endpoints failed:', fallbackErr);
         setError(err instanceof Error ? err.message : "An error occurred");
         setBrand(null);
+      } finally {
+        // Always stop loading, even on error
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
     }
   };
 

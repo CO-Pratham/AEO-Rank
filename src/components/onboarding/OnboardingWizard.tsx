@@ -1,10 +1,4 @@
 import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,15 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { X, ChevronLeft, ChevronRight, Check, Loader2 } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Check, Loader2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiCall } from "@/utils/api";
 import { useAppDispatch, useAppSelector } from "@/hooks/redux";
@@ -57,7 +43,7 @@ const OnboardingWizard = ({
   const [tempCompetitorName, setTempCompetitorName] = useState("");
   const [tempCompetitorDomain, setTempCompetitorDomain] = useState("");
   const [suggestedCompetitorsList, setSuggestedCompetitorsList] = useState<
-    string[]
+    Array<{ name: string; url?: string }>
   >([]);
   const [suggestedPromptsList, setSuggestedPromptsList] = useState<string[]>(
     []
@@ -83,6 +69,19 @@ const OnboardingWizard = ({
     "Germany",
     "India",
   ];
+
+  // Helper function to get country flag
+  const getCountryFlag = (country: string) => {
+    const flagMap: Record<string, string> = {
+      "United States": "🇺🇸",
+      "United Kingdom": "🇬🇧",
+      "Canada": "🇨🇦",
+      "Australia": "🇦🇺",
+      "Germany": "🇩🇪",
+      "India": "🇮🇳",
+    };
+    return flagMap[country] || "🇺🇸";
+  };
 
 
 
@@ -114,7 +113,7 @@ const OnboardingWizard = ({
 
       setLoadingCompetitors(true);
       try {
-        const response = await apiCall("/competitor/generate", {
+        const response = await apiCall("/competitor/gen", {
           method: "POST",
           body: JSON.stringify({
             brand_name: formData.brandName,
@@ -130,19 +129,23 @@ const OnboardingWizard = ({
         const data = await response.json();
 
         if (Array.isArray(data)) {
-          const competitorNames = data
-            .map((comp: { name?: string; brand?: string; competitor?: string }) =>
-              comp?.name || comp?.brand || comp?.competitor || ""
-            )
-            .filter(Boolean);
-          setSuggestedCompetitorsList(competitorNames);
+          const competitors = data
+            .map((comp: { name?: string; brand?: string; competitor?: string; url?: string; domain?: string; website?: string }) => {
+              const name = comp?.name || comp?.brand || comp?.competitor || "";
+              const url = comp?.url || comp?.domain || comp?.website || "";
+              return name ? { name, url: url || undefined } : null;
+            })
+            .filter((comp) => comp !== null) as Array<{ name: string; url?: string }>;
+          setSuggestedCompetitorsList(competitors);
         } else if (data && data.competitors && Array.isArray(data.competitors)) {
-          const competitorNames = data.competitors
-            .map((comp: { name?: string; brand?: string; competitor?: string }) =>
-              comp?.name || comp?.brand || comp?.competitor || ""
-            )
-            .filter(Boolean);
-          setSuggestedCompetitorsList(competitorNames);
+          const competitors = data.competitors
+            .map((comp: { name?: string; brand?: string; competitor?: string; url?: string; domain?: string; website?: string }) => {
+              const name = comp?.name || comp?.brand || comp?.competitor || "";
+              const url = comp?.url || comp?.domain || comp?.website || "";
+              return name ? { name, url: url || undefined } : null;
+            })
+            .filter((comp) => comp !== null) as Array<{ name: string; url?: string }>;
+          setSuggestedCompetitorsList(competitors);
         } else {
           throw new Error("Invalid response format");
         }
@@ -175,7 +178,7 @@ const OnboardingWizard = ({
         console.log('Domain:', formData.brandWebsite);
         console.log('User has navigated to step 3:', hasUserNavigatedToStep3);
 
-        const response = await apiCall(`/prompts/generate`, {
+        const response = await apiCall(`/prompts/gen`, {
           method: "POST",
           body: JSON.stringify({
             domain: formData.brandWebsite
@@ -264,35 +267,43 @@ const OnboardingWizard = ({
 
     // Persist competitors when leaving step 2
     if (currentStep === 2) {
-      // Build JSON array payload: [{ brand_name, domain, country }, ...]
+      // Build JSON array payload: [{ brand_name, domain }, ...]
       const competitorsArray = (formData.competitors || []).map((entry) => {
         const raw = (entry || "").trim();
-        // Split formats like "Name — domain" or "Name - domain"
-        const parts = raw.split(/\s+—\s+|\s+-\s+/);
-        let brandName = (parts[0] || raw).trim();
-        let domainCandidate = parts.length > 1 ? parts.slice(1).join("-").trim() : "";
+        
+        // Check if entry uses the || separator (manually added competitors)
+        const hasSeparator = raw.includes("||");
+        let competitorName = "";
+        let competitorDomain = "";
 
-        // If domain not explicitly provided, try to infer one
-        if (!domainCandidate) {
+        if (hasSeparator) {
+          const [name, domain] = raw.split("||");
+          competitorName = name.trim();
+          competitorDomain = domain.trim();
+        } else {
+          // For suggested competitors (just the name)
+          competitorName = raw;
+          // Try to infer domain from name (optional)
           const match = raw.match(/([a-zA-Z0-9][a-zA-Z0-9-]+\.[a-zA-Z]{2,})(?:\S*)/);
           if (match) {
-            domainCandidate = match[1];
+            competitorDomain = match[1];
           }
         }
 
         // Normalize domain to full URL with protocol and without paths
-        let domain = domainCandidate;
-        if (domain) {
-          domain = domain.replace(/^https?:\/\//i, "");
-          domain = domain.replace(/^www\./i, "");
-          domain = domain.split("/")[0];
-          domain = `https://${domain}`;
+        if (competitorDomain) {
+          // Remove protocol if present
+          competitorDomain = competitorDomain.replace(/^https?:\/\//i, "");
+          // Remove path if present (keep only domain)
+          competitorDomain = competitorDomain.split("/")[0];
+          // Add https:// protocol
+          competitorDomain = `https://${competitorDomain}`;
         }
 
+        // Return brand_name and domain (no country)
         return {
-          brand_name: brandName,
-          ...(domain ? { domain } : {}),
-          country: (formData.defaultLocation || "").trim(),
+          brand_name: competitorName,
+          domain: competitorDomain || "", // Send empty string if no domain
         };
       });
 
@@ -538,18 +549,18 @@ const OnboardingWizard = ({
     switch (currentStep) {
       case 1:
         return (
-          <Card className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/50 dark:via-indigo-950/50 dark:to-purple-950/50 border-2 border-blue-200 dark:border-blue-700 shadow-xl">
-            <CardHeader className="text-center pb-8 bg-gradient-to-r from-blue-500/15 via-indigo-500/15 to-purple-500/15 rounded-t-lg px-10 py-8">
-              <CardTitle className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          <div className="space-y-6 max-w-2xl mx-auto">
+            <div className="text-center space-y-2 mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
                 Tell us about your brand
-              </CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-300 mt-4">
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 Let's start by setting up your brand profile
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8 px-10 py-8">
-              <div className="space-y-4">
-                <Label htmlFor="brandName" className="font-semibold text-slate-700 dark:text-slate-300">
+              </p>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-sm border border-gray-200 dark:border-gray-700 space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="brandName" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Brand Name *
                 </Label>
                 <Input
@@ -559,31 +570,30 @@ const OnboardingWizard = ({
                   onChange={(e) =>
                     dispatch(updateOnboardingData({ brandName: e.target.value }))
                   }
-                  className="h-12 border-2 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 hover:border-blue-400 transition-all duration-300 rounded-lg bg-white/80 dark:bg-gray-800/80"
+                  className="h-10 text-sm"
                 />
               </div>
-              <div className="space-y-4">
-                <Label htmlFor="brandWebsite" className="font-semibold text-slate-700 dark:text-slate-300">
+              <div className="space-y-2">
+                <Label htmlFor="brandWebsite" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Brand Website *
                 </Label>
                 <Input
                   id="brandWebsite"
-                  placeholder="example.com (no need for http:// or www.)"
+                  placeholder="example.com"
                   value={formData.brandWebsite}
                   onChange={(e) => {
-                    // Auto-clean the domain - remove http://, https://, and www.
                     let cleanValue = e.target.value.trim();
                     cleanValue = cleanValue.replace(/^https?:\/\//i, '');
                     cleanValue = cleanValue.replace(/^www\./i, '');
-                    cleanValue = cleanValue.split('/')[0]; // Remove any path after domain
+                    cleanValue = cleanValue.split('/')[0];
                     dispatch(updateOnboardingData({ brandWebsite: cleanValue }));
                   }}
-                  className="h-12 border-2 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 hover:border-blue-400 transition-all duration-300 rounded-lg bg-white/80 dark:bg-gray-800/80"
+                  className="h-10 text-sm"
                 />
               </div>
-              <div className="space-y-4">
-                <Label htmlFor="defaultLocation" className="font-semibold text-slate-700 dark:text-slate-300">
-                  Default Location *
+              <div className="space-y-2">
+                <Label htmlFor="defaultLocation" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Country *
                 </Label>
                 <Select
                   value={formData.defaultLocation}
@@ -591,103 +601,116 @@ const OnboardingWizard = ({
                     dispatch(updateOnboardingData({ defaultLocation: value }))
                   }
                 >
-                  <SelectTrigger className="h-12 border-2 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 hover:border-blue-400 transition-all duration-300 rounded-lg bg-white/80 dark:bg-gray-800/80">
-                    <SelectValue placeholder="Select your location" />
+                  <SelectTrigger className="h-10 text-sm">
+                    <SelectValue placeholder="Select your country">
+                      {formData.defaultLocation && (
+                        <span className="flex items-center gap-2">
+                          <span>{getCountryFlag(formData.defaultLocation)}</span>
+                          <span>{formData.defaultLocation}</span>
+                        </span>
+                      )}
+                    </SelectValue>
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border-2 rounded-lg shadow-xl">
+                  <SelectContent>
                     {defaultLocations.map((location) => (
-                      <SelectItem key={location} value={location} className="py-3 hover:bg-blue-50 dark:hover:bg-blue-900/20">
-                        {location}
+                      <SelectItem key={location} value={location} className="text-sm">
+                        <span className="flex items-center gap-2">
+                          <span>{getCountryFlag(location)}</span>
+                          <span>{location}</span>
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         );
 
       case 2:
         return (
-          <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+          <div className="space-y-6 max-w-2xl mx-auto">
+            <div className="text-center space-y-2 mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
                 Add your competitors
-              </CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-300">
-                Who are your main competitors? We'll help you track their
-                performance.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label>Suggested competitors</Label>
-                {loadingCompetitors ? (
-                  <div className="flex items-center justify-center p-8 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 dark:bg-gradient-to-r dark:from-emerald-900/30 dark:to-teal-900/30 rounded-xl border-2 border-dashed border-emerald-300 dark:border-emerald-600">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center animate-pulse">
-                        <span className="text-white font-bold text-sm">A</span>
-                      </div>
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                      </div>
-                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                        Finding your competitors...
-                      </span>
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Who are your main competitors? We'll help you track their performance.
+              </p>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-sm border border-gray-200 dark:border-gray-700 space-y-6">
+              {/* Suggested Competitors */}
+              {loadingCompetitors ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                  <Sparkles className="w-5 h-5 text-gray-400 animate-pulse" />
+                  <div className="space-y-1.5 text-center">
+                    <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">Finding your competitors...</p>
+                    <div className="w-48 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden mx-auto">
+                      <div className="h-full bg-blue-600 rounded-full animate-pulse" style={{ width: '70%' }}></div>
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                    {suggestedCompetitorsList.length > 0 ? (
-                      suggestedCompetitorsList.map((competitor, index) => {
-                        const isAdded =
-                          formData.competitors.includes(competitor);
-                        return (
-                          <div
-                            key={index}
-                            className="flex items-center gap-2 p-2 border rounded-lg"
-                          >
+                </div>
+              ) : suggestedCompetitorsList.length > 0 && (
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Suggested competitors</Label>
+                  <div className="space-y-2">
+                    {suggestedCompetitorsList.map((competitor, index) => {
+                      // Format: name||url for checking if added
+                      const competitorString = competitor.url 
+                        ? `${competitor.name}||${competitor.url}`
+                        : competitor.name;
+                      const isAdded = formData.competitors.some(c => 
+                        c === competitorString || c === competitor.name
+                      );
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                        >
+                          <div className="flex flex-col">
                             <span
-                              className={`flex-1 text-sm ${
+                              className={`text-sm ${
                                 isAdded
-                                  ? "text-muted-foreground line-through"
-                                  : ""
+                                  ? "text-gray-400 line-through"
+                                  : "text-gray-700 dark:text-gray-300"
                               }`}
                             >
-                              {competitor}
+                              {competitor.name}
                             </span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 w-6 p-0 text-green-600 hover:bg-green-50"
-                              disabled={isAdded || addingCompetitor}
-                              onClick={() => addCompetitor(competitor)}
-                            >
-                              {addingCompetitor ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                "+"
-                              )}
-                            </Button>
+                            {competitor.url && (
+                              <span className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                {competitor.url.replace(/^https?:\/\//i, '')}
+                              </span>
+                            )}
                           </div>
-                        );
-                      })
-                    ) : (
-                      <p className="text-sm text-muted-foreground p-2">
-                        No suggestions available
-                      </p>
-                    )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-3 text-xs"
+                            disabled={isAdded || addingCompetitor}
+                            onClick={() => addCompetitor(competitorString)}
+                          >
+                            {addingCompetitor ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : isAdded ? (
+                              "Added"
+                            ) : (
+                              "Add"
+                            )}
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="competitor-name">Add custom competitors</Label>
-                <div className="flex gap-2">
+                </div>
+              )}
+              {/* Add Custom Competitors Form */}
+              <div className="space-y-3">
+                <Label htmlFor="competitor-name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Add competitor (Name & Domain required)</Label>
+                <div className="flex gap-3">
                   <Input
                     id="competitor-name"
-                    placeholder="Enter competitor brand name"
+                    placeholder="Competitor name"
                     value={tempCompetitorName}
                     onChange={(e) => setTempCompetitorName(e.target.value)}
                     onKeyPress={(e) => {
@@ -704,17 +727,16 @@ const OnboardingWizard = ({
                       }
                     }}
                     disabled={addingCompetitor}
+                    className="h-10 text-sm flex-1"
                   />
                   <Input
                     id="competitor-domain"
-                    placeholder="example.com (no http:// or www.)"
+                    placeholder="www.example.com"
                     value={tempCompetitorDomain}
                     onChange={(e) => {
-                      // Auto-clean the domain - remove http://, https://, and www.
                       let cleanValue = e.target.value.trim();
                       cleanValue = cleanValue.replace(/^https?:\/\//i, '');
-                      cleanValue = cleanValue.replace(/^www\./i, '');
-                      cleanValue = cleanValue.split('/')[0]; // Remove any path after domain
+                      cleanValue = cleanValue.split('/')[0];
                       setTempCompetitorDomain(cleanValue);
                     }}
                     onKeyPress={(e) => {
@@ -731,16 +753,24 @@ const OnboardingWizard = ({
                       }
                     }}
                     disabled={addingCompetitor}
+                    className="h-10 text-sm flex-1"
                   />
                   <Button
                     onClick={() => {
-                      if (!tempCompetitorName.trim() || !tempCompetitorDomain.trim()) return;
+                      if (!tempCompetitorName.trim() || !tempCompetitorDomain.trim()) {
+                        toast({
+                          title: "Both fields required",
+                          description: "Please enter both competitor name and domain.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
                       addCompetitor(`${tempCompetitorName}||${tempCompetitorDomain}`);
                       setTempCompetitorName("");
                       setTempCompetitorDomain("");
                     }}
                     disabled={!tempCompetitorName.trim() || !tempCompetitorDomain.trim() || addingCompetitor}
-                    className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+                    className="h-10 px-4 text-sm"
                   >
                     {addingCompetitor ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -750,181 +780,151 @@ const OnboardingWizard = ({
                   </Button>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Your competitors ({formData.competitors.length})</Label>
-                <div className="flex flex-wrap gap-2 min-h-[60px] p-2 border rounded-md max-h-[120px] overflow-y-auto">
-                  {formData.competitors.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">
-                      No competitors added yet
-                    </p>
-                  ) : (
-                    formData.competitors.map((competitor, index) => {
+
+              {/* Your Competitors List */}
+              {formData.competitors.length > 0 && (
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Your competitors ({formData.competitors.length})</Label>
+                  <div className="flex flex-wrap gap-2 p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
+                    {formData.competitors.map((competitor, index) => {
                       const hasDomain = competitor.includes("||");
                       const [compName, compDomain] = hasDomain ? competitor.split("||") : [competitor, ""];
-                      // Clean and format domain for display
                       const displayDomain = compDomain 
-                        ? `www.${compDomain.replace(/^https?:\/\//i, '').replace(/^www\./i, '')}`
+                        ? compDomain.replace(/^https?:\/\//i, '')
                         : '';
                       return (
-                        <div key={index} className="flex items-center gap-2">
-                          <Badge
-                            variant="secondary"
-                            className="flex items-center gap-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors"
-                          >
-                            <div className="flex flex-col text-left">
-                              <span className="leading-tight">{compName}</span>
-                              {displayDomain ? (
-                                <span className="text-xs text-emerald-700 leading-tight">{displayDomain}</span>
-                              ) : null}
-                            </div>
-                            <X
-                              className="w-3 h-3 cursor-pointer hover:text-destructive"
-                              onClick={() => removeCompetitor(competitor)}
-                            />
-                          </Badge>
-                        </div>
+                        <Badge
+                          key={index}
+                          variant="secondary"
+                          className="flex items-center gap-2 py-1.5 px-3 text-xs"
+                        >
+                          <div className="flex flex-col text-left">
+                            <span className="leading-tight text-xs font-medium">{compName}</span>
+                            {displayDomain && (
+                              <span className="text-[10px] opacity-70 leading-tight">{displayDomain}</span>
+                            )}
+                          </div>
+                          <X
+                            className="w-3.5 h-3.5 cursor-pointer hover:text-red-500 flex-shrink-0"
+                            onClick={() => removeCompetitor(competitor)}
+                          />
+                        </Badge>
                       );
-                    })
-                  )}
+                    })}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              )}
+            </div>
+          </div>
         );
       case 3:
         return (
-          <Card className="bg-gradient-to-br from-purple-50 via-pink-50 to-rose-50 dark:from-purple-950/50 dark:via-pink-950/50 dark:to-rose-950/50 border-2 border-purple-200 dark:border-purple-700 shadow-xl">
-            <CardHeader className="text-center pb-8 bg-gradient-to-r from-purple-500/15 via-pink-500/15 to-rose-500/15 rounded-t-lg px-10 py-8">
-              <CardTitle className="bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 bg-clip-text text-transparent mb-4">
-                Add your prompts
-              </CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-300">
-                What prompts or queries are relevant to your business? These will be monitored across AI platforms.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8 px-10 py-8">
-              <div className="space-y-5">
-                <Label className="font-semibold text-slate-700 dark:text-slate-300">
-                  Suggested prompts
-                </Label>
-                {loadingPrompts ? (
-                  <div className="flex items-center justify-center p-8 bg-gradient-to-r from-purple-50/80 to-pink-50/80 dark:bg-gradient-to-r dark:from-purple-900/30 dark:to-pink-900/30 rounded-xl border-2 border-dashed border-purple-300 dark:border-purple-600">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center animate-pulse">
-                        <span className="text-white font-bold text-sm">A</span>
-                      </div>
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                      </div>
-                      <span className="text-purple-600 dark:text-purple-400 font-medium">
-                        Generating smart prompts...
-                      </span>
+          <div className="space-y-6 max-w-2xl mx-auto">
+            <div className="text-center space-y-2 mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                Review your prompts
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                You can always add more prompts and customize them later in your project.
+              </p>
+            </div>
+            
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-sm border border-gray-200 dark:border-gray-700 space-y-6">
+              {loadingPrompts ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                  <Sparkles className="w-5 h-5 text-gray-400 animate-pulse" />
+                  <div className="space-y-1.5 text-center">
+                    <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">Generating prompts...</p>
+                    <div className="w-48 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden mx-auto">
+                      <div className="h-full bg-blue-600 rounded-full animate-pulse" style={{ width: '70%' }}></div>
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-3 max-h-[160px] overflow-y-auto bg-gradient-to-br from-white/80 to-purple-50/50 dark:from-gray-900/80 dark:to-purple-900/30 p-5 rounded-xl border-2 border-purple-100 dark:border-purple-800">
-                    {suggestedPromptsList.length > 0 ? (
-                      suggestedPromptsList.map((prompt, index) => {
-                        const isAdded = formData.prompts.includes(prompt);
-                        return (
-                          <div
-                            key={index}
-                            className="flex items-center gap-4 p-4 border-2 rounded-xl bg-gradient-to-r from-white to-purple-50/30 dark:from-gray-800 dark:to-purple-900/20 hover:shadow-lg hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-300"
-                          >
-                            <span
-                              className={`flex-1 ${
-                                isAdded
-                                  ? "text-muted-foreground line-through"
-                                  : "text-slate-700 dark:text-slate-300"
-                              }`}
-                            >
-                              {prompt}
-                            </span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-9 w-9 p-0 text-green-600 hover:bg-green-50 border-2 hover:border-green-400 hover:shadow-md transition-all duration-300 rounded-lg"
-                              disabled={isAdded || addingPrompt}
-                              onClick={() => addPrompt(prompt)}
-                            >
-                              {addingPrompt ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                "+"
-                              )}
-                            </Button>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <p className="text-muted-foreground p-6 text-center bg-gradient-to-r from-gray-50 to-purple-50/30 dark:from-gray-800 dark:to-purple-900/20 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600">
-                        No suggestions available
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="space-y-5">
-                <Label htmlFor="prompt" className="font-semibold text-slate-700 dark:text-slate-300">
-                  Add custom prompts
-                </Label>
-                <div className="flex gap-4">
-                  <Textarea
-                    id="prompt"
-                    placeholder="Enter your custom prompt (e.g., 'Best project management tools for small teams')"
-                    value={tempInput}
-                    onChange={(e) => setTempInput(e.target.value)}
-                    rows={3}
-                    disabled={addingPrompt}
-                    className="border-2 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 hover:border-purple-400 transition-all duration-300 resize-none rounded-xl bg-white/80 dark:bg-gray-800/80"
-                  />
-                  <Button
-                    onClick={() => {
-                      addPrompt(tempInput);
-                      setTempInput("");
-                    }}
-                    disabled={!tempInput.trim() || addingPrompt}
-                    className="bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 hover:from-purple-600 hover:via-pink-600 hover:to-rose-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 px-8 font-semibold rounded-xl"
-                  >
-                    {addingPrompt ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      "Add"
-                    )}
-                  </Button>
                 </div>
-              </div>
-              <div className="space-y-5">
-                <Label className="font-semibold text-slate-700 dark:text-slate-300">
-                  Your prompts ({formData.prompts.length})
-                </Label>
-                <div className="space-y-3 max-h-[160px] overflow-y-auto bg-gradient-to-br from-white/80 to-purple-50/50 dark:from-gray-900/80 dark:to-purple-900/30 p-5 rounded-xl border-2 border-purple-100 dark:border-purple-800">
-                  {formData.prompts.length === 0 ? (
-                    <p className="text-muted-foreground p-8 text-center bg-gradient-to-r from-gray-50 to-purple-50/30 dark:from-gray-800 dark:to-purple-900/20 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600">
-                      No prompts added yet
-                    </p>
-                  ) : (
-                    formData.prompts.map((prompt, index) => (
-                      <div
-                        key={index}
-                        className="flex items-start gap-4 p-5 border-2 rounded-xl bg-gradient-to-r from-purple-50/80 via-pink-50/80 to-rose-50/80 dark:from-purple-900/40 dark:via-pink-900/40 dark:to-rose-900/40 border-purple-200 dark:border-purple-700 hover:shadow-lg hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-300"
-                      >
-                        <span className="flex-1 text-slate-700 dark:text-slate-300">
-                          {prompt}
-                        </span>
-                        <X
-                          className="w-5 h-5 cursor-pointer hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full p-1 flex-shrink-0 mt-0.5 transition-all duration-300"
-                          onClick={() => removePrompt(prompt)}
-                        />
-                      </div>
-                    ))
+              ) : (
+                <div className="space-y-4">
+                  {formData.prompts.length > 0 && (
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Your prompts ({formData.prompts.length})</Label>
                   )}
+                  
+                  {/* Display added prompts from suggestions or custom */}
+                  {formData.prompts.map((prompt, index) => (
+                    <div
+                      key={index}
+                      className="flex items-start gap-3 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-sm transition-shadow"
+                    >
+                      <div className="flex-shrink-0 mt-0.5">
+                        <span className="text-lg">{getCountryFlag(formData.defaultLocation)}</span>
+                      </div>
+                      <span className="flex-1 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                        {prompt}
+                      </span>
+                      <button
+                        onClick={() => removePrompt(prompt)}
+                        className="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Show suggested prompts that haven't been added yet */}
+                  {suggestedPromptsList.filter(p => !formData.prompts.includes(p)).length > 0 && (
+                    <>
+                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 pt-2">Suggested prompts</Label>
+                      {suggestedPromptsList.filter(p => !formData.prompts.includes(p)).map((prompt, index) => (
+                        <div
+                          key={`suggestion-${index}`}
+                          className="flex items-start gap-3 p-4 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                          onClick={() => addPrompt(prompt)}
+                        >
+                          <div className="flex-shrink-0 mt-0.5">
+                            <span className="text-lg">{getCountryFlag(formData.defaultLocation)}</span>
+                          </div>
+                          <span className="flex-1 text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                            {prompt}
+                          </span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {/* Input for custom prompts */}
+                  <div className="space-y-2 pt-2">
+                    <Label className="text-xs font-medium text-gray-700 dark:text-gray-300">Add custom prompt</Label>
+                    <Textarea
+                      placeholder="Enter your custom prompt"
+                      value={tempInput}
+                      onChange={(e) => setTempInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && tempInput.trim()) {
+                          e.preventDefault();
+                          addPrompt(tempInput);
+                          setTempInput("");
+                        }
+                      }}
+                      rows={2}
+                      className="resize-none text-xs"
+                    />
+                    
+                    <div className="flex items-center justify-end gap-2">
+                      {tempInput.trim() && (
+                        <Button
+                          onClick={() => {
+                            addPrompt(tempInput);
+                            setTempInput("");
+                          }}
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                        >
+                          Add Prompt
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              )}
+            </div>
+          </div>
         );
 
       default:
@@ -932,128 +932,112 @@ const OnboardingWizard = ({
     }
   };
 
+  if (!isOpen) return null;
+
+  const steps = ['Brand', 'Competitors', 'Prompts'];
+
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={() => {}}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0 border-0 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl [&>button]:hidden overflow-y-auto">
-          {/* Loading Overlay */}
-          {isProcessingNext && (
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-2xl">
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-2xl text-center space-y-4">
-                <div className="flex items-center justify-center space-x-2">
-                  <img src="/AEO-Rank.jpeg" alt="AEO Rank Logo" className="w-12 h-12 rounded-lg object-cover animate-pulse" />
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+      <div className="h-screen bg-gray-50 dark:bg-gray-900 flex flex-col overflow-hidden">
+        {/* Header with Progress - Single Line */}
+        <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
+            {/* Logo */}
+            <img src="/AEO-Rank.jpeg" alt="AEO Rank" className="h-8 w-8 rounded object-cover flex-shrink-0" />
+            
+            {/* Steps Navigation */}
+            <div className="flex items-center space-x-2">
+              {steps.map((step, index) => (
+                <div key={step} className="flex items-center">
+                  <div
+                    className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
+                      index + 1 === currentStep
+                        ? 'bg-blue-600 text-white'
+                        : index + 1 < currentStep
+                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                    }`}
+                  >
+                    {step}
                   </div>
+                  {index < steps.length - 1 && (
+                    <ChevronRight className="w-4 h-4 mx-2 text-gray-400" />
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-lg font-semibold text-foreground">Processing...</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {currentStep === 1 && "Saving your brand details"}
-                    {currentStep === 2 && "Saving your competitors"}
-                    {currentStep === 3 && "Preparing your prompts"}
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
-          )}
 
-          {/* Header */}
-          <div className="sticky top-0 z-10 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-white px-8 py-6">
+            {/* Close Button */}
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm transition-all duration-300 flex items-center justify-center group"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0"
             >
-              <X className="w-4 h-4 text-white group-hover:scale-110 transition-transform duration-300" />
+              <X className="w-5 h-5" />
             </button>
-            
-            <div className="text-center mb-6">
-              <DialogTitle className="text-2xl font-bold text-white mb-2">
-                Welcome to AEORank
-              </DialogTitle>
-              <p className="text-blue-100 opacity-90">Setup your AI presence in just {totalSteps} simple steps</p>
-            </div>
-            
-            <div className="flex items-center justify-between text-sm text-blue-100 mb-3">
-              <span>Step {currentStep} of {totalSteps}</span>
-              <span>{Math.round(progress)}% complete</span>
-            </div>
-            
-            <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden">
-              <div
-                className="h-full bg-white rounded-full transition-all duration-700 ease-out shadow-lg"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
           </div>
+        </div>
 
-          {/* Content */}
-          <div className="p-8 bg-gray-50/50 dark:bg-gray-800/50">
-            <div className="max-w-2xl mx-auto">
-              {renderStep()}
-            </div>
+        {/* Content Area - Scrollable */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="py-12 px-8">
+            {renderStep()}
           </div>
+        </div>
 
-          {/* Footer */}
-          <div className="sticky bottom-0 z-10 flex items-center justify-between px-8 py-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+        {/* Footer - Fixed at bottom */}
+        <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-8 py-5">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <Button
+              variant="outline"
+              onClick={handlePrev}
+              disabled={currentStep === 1 || isProcessingNext}
+              className="flex items-center gap-2 h-11 px-6 text-sm font-medium"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Previous</span>
+            </Button>
+
+            {currentStep === totalSteps ? (
               <Button
-                variant="outline"
-                onClick={handlePrev}
-                disabled={currentStep === 1}
-                className="flex items-center gap-3 px-6 py-3 font-medium border-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200 rounded-lg"
+                onClick={handleComplete}
+                disabled={!canProceed()}
+                className="bg-black hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 text-white h-11 px-10 rounded-lg font-medium text-sm"
               >
-                <ChevronLeft className="w-4 h-4" />
-                Previous
+                Launch Dashboard
               </Button>
-
-              <div className="flex gap-2">
-                {Array.from({ length: totalSteps }).map((_, index) => (
-                  <div
-                    key={index}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      index + 1 <= currentStep 
-                        ? "bg-gradient-to-r from-blue-500 to-indigo-500" 
-                        : "bg-gray-300 dark:bg-gray-600"
-                    }`}
-                  />
-                ))}
-              </div>
-
-              {currentStep === totalSteps ? (
-                <Button
-                  onClick={handleComplete}
-                  disabled={!canProceed()}
-                  className="flex items-center gap-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 px-6 py-3 font-semibold rounded-lg"
-                >
-                  <Check className="w-4 h-4" />
-                  Launch Dashboard
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleNext}
-                  disabled={!canProceed()}
-                  className="flex items-center gap-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white border-0 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 px-6 py-3 font-semibold rounded-lg group"
-                >
-                  Next
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                </Button>
-              )}
+            ) : (
+              <Button
+                onClick={handleNext}
+                disabled={!canProceed() || isProcessingNext}
+                className="group bg-black hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 text-white h-11 px-10 rounded-lg font-medium flex items-center justify-center gap-2 text-sm transition-all"
+              >
+                {isProcessingNext ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Next step</span>
+                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
+                  </>
+                )}
+              </Button>
+            )}
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </div>
       
       {isLaunching && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-8 shadow-2xl flex flex-col items-center gap-4 max-w-md mx-4">
-            <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                Setting up your dashboard...
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-10 shadow-2xl flex flex-col items-center gap-6 max-w-md mx-4">
+            <Loader2 className="w-14 h-14 animate-spin text-blue-600" />
+            <div className="text-center space-y-3">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                Analyzing your competitors and prompts...
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                This may take up to 60 seconds. Please wait while we analyze your prompts.
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                This may take up to 60 seconds. Please wait while we set up your dashboard.
               </p>
             </div>
           </div>

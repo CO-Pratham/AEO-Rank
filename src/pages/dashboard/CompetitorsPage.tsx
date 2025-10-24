@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { BrandAvatar } from "@/components/ui/brand-avatar";
 import {
   Dialog,
   DialogContent,
@@ -150,14 +150,11 @@ const CompetitorsPage = () => {
           .replace(/\/.*$/, "");          // Remove any path after domain
       }
 
-      // Call API to remove competitor using clean domain (e.g., bmw.com)
+     
       const requestBody = {
         domain: domain,
       };
       
-      console.log("🗑️ Delete request URL:", `https://aeotest-production.up.railway.app/user/competitor/delete`);
-      console.log("🗑️ Delete request method:", "DELETE");
-      console.log("🗑️ Delete request body:", JSON.stringify(requestBody, null, 2));
 
       const response = await fetch(
         `https://aeotest-production.up.railway.app/user/competitor/delete`,
@@ -218,6 +215,48 @@ const CompetitorsPage = () => {
         console.log("No access token found for existing competitors");
         setExistingCompetitors([]);
         return;
+      }
+
+      // Fetch current brand from /me endpoint
+      let ourBrand: YourCompetitor | null = null;
+      try {
+        const meResponse = await fetch(
+          "https://aeotest-production.up.railway.app/me",
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (meResponse.ok) {
+          const meData = await meResponse.json();
+          console.log("Our Brand from /me API:", meData);
+          
+          if (meData && (meData.brand_name || meData.name)) {
+            const brandName = meData.brand_name || meData.name;
+            const brandDomain = meData.domain || meData.website || `${brandName.toLowerCase().replace(/\s+/g, "")}.com`;
+            
+            // Clean domain
+            const cleanDomain = brandDomain
+              .replace(/^https?:\/\//i, "")
+              .replace(/^www\./i, "")
+              .replace(/\/.*$/, "");
+            
+            ourBrand = {
+              id: 0,
+              name: brandName,
+              logo: getDomainLogo(cleanDomain, meData.logo, brandName),
+              website: cleanDomain.startsWith("http") ? cleanDomain : `https://${cleanDomain}`,
+              isYourBrand: true,
+            };
+            console.log("✅ Our brand created:", ourBrand);
+          }
+        }
+      } catch (meError) {
+        console.error("Error fetching /me endpoint:", meError);
       }
 
       // Fetch from /user/getcompetitor to get all existing competitors
@@ -320,23 +359,41 @@ const CompetitorsPage = () => {
           return {
             id: index + 1,
             name: brandName,
-            logo: getDomainLogo(domain, item.logo),
+            logo: getDomainLogo(domain, item.logo, brandName),
             website: domain.startsWith("http") ? domain : `https://${domain}`,
             isYourBrand: false,
           };
         });
-        setExistingCompetitors(transformedData);
+        
+        // Add our brand at the beginning of the list
+        const allCompetitors = ourBrand 
+          ? [ourBrand, ...transformedData] 
+          : transformedData;
+        
+        setExistingCompetitors(allCompetitors);
 
         // Store in Redux as well with actual visibility/sentiment/position from API
         const reduxCompetitors = competitorsArray.map((item: any, index: number) => {
-          // Use the same name extraction as transformedData
+          // Use the same name extraction and domain cleaning as transformedData
           const correspondingItem = transformedData[index];
           const brandName = correspondingItem ? correspondingItem.name : `Competitor ${index + 1}`;
+          
+          // Extract and clean domain the same way as transformedData (lines 344-356)
+          let domain = item.domain || item.website || "";
+          if (domain) {
+            domain = domain
+              .replace(/^https?:\/\//i, "")
+              .replace(/^www\./i, "")
+              .replace(/\/.*$/, "");
+          }
+          if (!domain) {
+            domain = brandName.toLowerCase().replace(/\s+/g, "") + ".com";
+          }
           
           return {
           id: index + 1,
           name: brandName,
-          domain: item.domain || item.website || "",
+          domain: domain,  // Now using cleaned domain
           logo: transformedData[index]?.logo || "",
           visibility: `${Math.round(Number(item.avg_visibility) || 0)}%`,
           sentiment: Number.isFinite(Number(item.avg_sentiment))
@@ -348,12 +405,24 @@ const CompetitorsPage = () => {
         });
         dispatch(setCompetitors(reduxCompetitors));
       } else {
-        setExistingCompetitors([]);
+        // No competitors, but still show our brand if available
+        const allCompetitors = ourBrand ? [ourBrand] : [];
+        setExistingCompetitors(allCompetitors);
         dispatch(setCompetitors([]));
       }
     } catch (err) {
       console.error("Error fetching existing competitors:", err);
-      setExistingCompetitors([]);
+      // On error, still show our brand if we fetched it successfully
+      const token = localStorage.getItem("accessToken");
+      if (!token) {
+        setExistingCompetitors([]);
+      } else {
+        // Try to preserve our brand data
+        setExistingCompetitors((prev) => {
+          const hasOurBrand = prev.some(c => c.isYourBrand);
+          return hasOurBrand ? prev : [];
+        });
+      }
       dispatch(setCompetitors([]));
     } finally {
       dispatch(setLoading(false));
@@ -382,7 +451,8 @@ const CompetitorsPage = () => {
 
         // Use real brand data from context
         const response = await fetch(
-          "https://aeotest-production.up.railway.app/competitor/generate",
+          "https://aeotest-production.up.railway.app/competitor/geerate",
+         // "https://aeotest-production.up.railway.app/competitor/generate",
           {
             method: "POST",
             headers: {
@@ -428,14 +498,15 @@ const CompetitorsPage = () => {
                     .replace(/\s+/g, "") + ".com";
               }
 
+              const brandName = item.brand_name ||
+                item.name ||
+                item.competitor ||
+                `Competitor ${index + 1}`;
+
               return {
                 id: Date.now() + index,
-                name:
-                  item.brand_name ||
-                  item.name ||
-                  item.competitor ||
-                  `Competitor ${index + 1}`,
-                logo: getDomainLogo(domain, item.logo),
+                name: brandName,
+                logo: getDomainLogo(domain, item.logo, brandName),
                 mentions:
                   item.mentions || Math.floor(Math.random() * 1000) + 100,
                 domain: domain,
@@ -471,7 +542,7 @@ const CompetitorsPage = () => {
           return {
             id: comp.id,
             name: comp.name,
-            logo: getDomainLogo(domain, comp.logo),
+            logo: getDomainLogo(domain, comp.logo, comp.name),
             website: domain,
             isYourBrand: false,
           };
@@ -662,7 +733,7 @@ const CompetitorsPage = () => {
       const newCompetitor: YourCompetitor = {
         id: Date.now(),
         name: addedName,
-        logo: getDomainLogo(cleanDomain, ""),
+        logo: getDomainLogo(cleanDomain, "", addedName),
         website: cleanDomain.startsWith("http") ? cleanDomain : `https://${cleanDomain}`,
         isYourBrand: false,
       };
@@ -765,26 +836,14 @@ const CompetitorsPage = () => {
               >
                 <CardContent className="p-6">
                   <div className="flex flex-col items-center text-center space-y-4">
-                    <div className="w-16 h-16 rounded-2xl bg-white border border-border/20 shadow-sm flex items-center justify-center group-hover:shadow-md transition-shadow overflow-hidden">
-                      {competitor.logo ? (
-                        <img
-                          src={competitor.logo}
-                          alt={competitor.name}
-                          className="w-full h-full object-contain p-2"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                            const fallback = e.currentTarget
-                              .nextElementSibling as HTMLElement | null;
-                            if (fallback) fallback.style.display = "flex";
-                          }}
-                        />
-                      ) : null}
-                      <span
-                        className="text-2xl font-bold text-gray-600"
-                        style={{ display: competitor.logo ? "none" : "flex" }}
-                      >
-                        {generateInitials(competitor.name)}
-                      </span>
+                    <div className="rounded-2xl bg-white border border-border/20 shadow-sm flex items-center justify-center group-hover:shadow-md transition-shadow overflow-hidden">
+                      <BrandAvatar
+                        brandName={competitor.name}
+                        domain={competitor.domain}
+                        logoUrl={competitor.logo}
+                        size="2xl"
+                        className="rounded-2xl"
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <h3 className="font-semibold text-base text-foreground leading-tight">
@@ -873,27 +932,15 @@ const CompetitorsPage = () => {
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="w-12 h-12 rounded-xl border border-border/20 bg-white shadow-sm flex items-center justify-center flex-shrink-0 overflow-hidden">
-                        {competitor.logo ? (
-                          <img
-                            src={competitor.logo}
-                            alt={competitor.name}
-                            className="w-full h-full object-contain p-1"
-                            onError={(e) => {
-                              console.log("Logo failed to load for:", competitor.name);
-                              e.currentTarget.style.display = "none";
-                              const fallback = e.currentTarget
-                                .nextElementSibling as HTMLElement | null;
-                              if (fallback) fallback.style.display = "flex";
-                            }}
-                          />
-                        ) : null}
-                        <span
-                          className="text-lg font-bold text-gray-600"
-                          style={{ display: competitor.logo ? "none" : "flex" }}
-                        >
-                          {generateInitials(competitor.name || "C")}
-                        </span>
+                      <div className="rounded-xl border border-border/20 bg-white shadow-sm flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        <BrandAvatar
+                          brandName={competitor.name || "Unknown Competitor"}
+                          domain={competitor.website}
+                          logoUrl={competitor.logo}
+                          size="xl"
+                          className="rounded-xl"
+                          highlighted={competitor.isYourBrand}
+                        />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">

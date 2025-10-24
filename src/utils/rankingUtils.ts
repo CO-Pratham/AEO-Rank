@@ -1,9 +1,12 @@
+import { getDomainLogo } from './logoUtils';
+
 interface RankingData {
   brand: string;
   visibility: number;
   sentiment?: number;
   position?: number;
   logo?: string;
+  domain?: string;
 }
 
 interface ProcessedRankingItem {
@@ -12,8 +15,8 @@ interface ProcessedRankingItem {
   logo?: string;
   visibility: string;
   visibilityValue: number;
-  sentiment: number;
-  position: string;
+  sentiment: number | null;
+  position: string | null;
   positionValue: number;
   originalPosition?: number;
 }
@@ -74,7 +77,8 @@ export const processRankingData = (
       visibility: Number(item.avg_visibility) || 0,
       sentiment: Number(item.avg_sentiment) || 0,
       position: Number(item.avg_position) || 0,
-      logo: item.logo || ""
+      logo: item.logo || "",
+      domain: item.domain || ""
     }));
   }
 
@@ -101,6 +105,8 @@ export const processRankingData = (
   // Assign final positions based on sorted order
   return sortedData.map((item, index) => {
     const finalPosition = index + 1;
+    const visibility = item.visibility || 0;
+    const hasVisibility = visibility > 0;
     
     // Brand name mapping for common variations
     const brandNameMapping: Record<string, string> = {
@@ -109,40 +115,27 @@ export const processRankingData = (
       'BAJAJ': 'Bajaj Finserv',
     };
     
-    // Domain mapping for specific brands to get correct logos
-    const brandDomainMapping: Record<string, string> = {
-      'bajaj': 'bajajfinserv.in',
-      'Bajaj': 'bajajfinserv.in',
-      'BAJAJ': 'bajajfinserv.in',
-      'bajaj finserv': 'bajajfinserv.in',
-      'Bajaj Finserv': 'bajajfinserv.in',
-    };
-    
     const displayName = brandNameMapping[item.brand] || item.brand;
     
-    // Generate proper logo URL
-    const getLogoUrl = (brandName: string, existingLogo?: string) => {
-      if (existingLogo && existingLogo.startsWith('http')) {
-        return existingLogo;
-      }
-      
-      // Check if we have a specific domain mapping for this brand
-      const mappedDomain = brandDomainMapping[brandName.toLowerCase()] || brandDomainMapping[brandName];
-      if (mappedDomain) {
-        return `https://www.google.com/s2/favicons?domain=${mappedDomain}&sz=64`;
-      }
-      
-      return `https://www.google.com/s2/favicons?domain=${brandName.toLowerCase().replace(/\s+/g, '')}.com&sz=64`;
-    };
+    // Get the domain for logo fetching
+    let domain = item.domain || `${item.brand.toLowerCase().replace(/\s+/g, "")}.com`;
+    if (domain) {
+      domain = domain
+        .replace(/^https?:\/\//i, "")
+        .replace(/^www\./i, "")
+        .replace(/\/.*$/, "");
+    }
     
     return {
       id: item.brand,
       brand: displayName,
-      logo: getLogoUrl(item.brand, item.logo),
-      visibility: `${Math.round(item.visibility)}%`,
-      visibilityValue: item.visibility,
-      sentiment: item.sentiment || Math.round(50 + Math.random() * 30),
-      position: `#${finalPosition}`,
+      logo: getDomainLogo(domain, item.logo, item.brand),
+      visibility: `${Math.round(visibility)}%`,
+      visibilityValue: visibility,
+      sentiment: hasVisibility && Number.isFinite(Number(item.sentiment))
+        ? Math.round(Number(item.sentiment))
+        : null,
+      position: hasVisibility ? `#${finalPosition}` : null,
       positionValue: finalPosition,
       originalPosition: item.position
     };

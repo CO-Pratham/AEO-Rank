@@ -59,11 +59,12 @@ export const SourcesProvider: React.FC<SourcesProviderProps> = ({ children }) =>
       });
       
       if (!response.ok) {
+        console.log('❌ Sources API failed with status:', response.status);
         throw new Error('Failed to fetch sources');
       }
       
       const data = await response.json();
-      console.log('Sources API Response:', data);
+      console.log('✅ Sources API Response (200):', data);
       
       // Process the API response to create pie chart data
       if (data && Array.isArray(data)) {
@@ -114,8 +115,9 @@ export const SourcesProvider: React.FC<SourcesProviderProps> = ({ children }) =>
         
         setSourcesTypeData(sourcesTypeData);
         setTopSourcesData(topSourcesData);
+        console.log('✅ Sources data processed and set');
       } else {
-        
+        console.log('⚠️ No sources data in response, using fallback');
         setSourcesTypeData([
           { name: 'Corporate', value: 45, color: '#8b87ff' },
           { name: 'UGC', value: 30, color: '#82ca9d' },
@@ -127,7 +129,7 @@ export const SourcesProvider: React.FC<SourcesProviderProps> = ({ children }) =>
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
-      console.error('Error fetching sources:', err);
+      console.error('❌ Error fetching sources:', err);
       // Set fallback data on error
       setSourcesTypeData([
         { name: 'Corporate', value: 45, color: '#8b87ff' },
@@ -136,6 +138,7 @@ export const SourcesProvider: React.FC<SourcesProviderProps> = ({ children }) =>
       ]);
       setTopSourcesData([]);
     } finally {
+      console.log('⏹️ Sources loading stopped');
       setLoading(false);
     }
   };

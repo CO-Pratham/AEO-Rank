@@ -17,12 +17,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { BarChart3 } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { BarChart3, Info } from "lucide-react";
+import { BrandAvatar } from "@/components/ui/brand-avatar";
 import { LoadingScreen } from "@/components/ui/loading-spinner";
 import { RootState, AppDispatch } from "@/store";
 import { setLoading, setError, setRankingData, setPromptRankingData } from "@/store/slices/rankingSlice";
 import { processRankingData, getRankingData, isRankingDataFresh } from "@/utils/rankingUtils";
+import {
+  Tooltip as UITooltip,
+  TooltipContent as UITooltipContent,
+  TooltipProvider as UITooltipProvider,
+  TooltipTrigger as UITooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface RankingItem {
   id: number;
@@ -182,23 +188,62 @@ const RankingPage = () => {
                     <TableHead className="text-xs font-medium text-muted-foreground border-r">
                       Brand
                     </TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground text-right border-r">
-                      Visibility{" "}
-                      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-muted text-muted-foreground ml-1 text-[10px]">
-                        ?
-                      </span>
+                    <TableHead className="text-xs font-medium text-muted-foreground text-right pr-4 border-r">
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Visibility</span>
+                        <UITooltipProvider delayDuration={0}>
+                          <UITooltip>
+                            <UITooltipTrigger asChild>
+                              <button className="inline-flex items-center justify-center cursor-pointer">
+                                <Info className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                              </button>
+                            </UITooltipTrigger>
+                            <UITooltipContent side="top" className="max-w-xs bg-white border-gray-200">
+                              <p className="text-xs text-gray-700">
+                                Percentage of AI conversations where this brand was mentioned in the response
+                              </p>
+                            </UITooltipContent>
+                          </UITooltip>
+                        </UITooltipProvider>
+                      </div>
                     </TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground text-right border-r">
-                      Sentiment{" "}
-                      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-muted text-muted-foreground ml-1 text-[10px]">
-                        ?
-                      </span>
+                    <TableHead className="text-xs font-medium text-muted-foreground text-right pr-4 border-r">
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Sentiment</span>
+                        <UITooltipProvider delayDuration={0}>
+                          <UITooltip>
+                            <UITooltipTrigger asChild>
+                              <button className="inline-flex items-center justify-center cursor-pointer">
+                                <Info className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                              </button>
+                            </UITooltipTrigger>
+                            <UITooltipContent side="top" className="max-w-xs bg-white border-gray-200">
+                              <p className="text-xs text-gray-700">
+                                Average sentiment score (0-100) indicating how positively the brand is mentioned
+                              </p>
+                            </UITooltipContent>
+                          </UITooltip>
+                        </UITooltipProvider>
+                      </div>
                     </TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground text-right pr-6">
-                      Position{" "}
-                      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-muted text-muted-foreground ml-1 text-[10px]">
-                        ?
-                      </span>
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Position</span>
+                        <UITooltipProvider delayDuration={0}>
+                          <UITooltip>
+                            <UITooltipTrigger asChild>
+                              <button className="inline-flex items-center justify-center cursor-pointer">
+                                <Info className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                              </button>
+                            </UITooltipTrigger>
+                            <UITooltipContent side="top" className="max-w-xs bg-white border-gray-200">
+                              <p className="text-xs text-gray-700">
+                                Ranking position based on visibility percentage. Higher visibility = better position
+                              </p>
+                            </UITooltipContent>
+                          </UITooltip>
+                        </UITooltipProvider>
+                      </div>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -213,12 +258,11 @@ const RankingPage = () => {
                     </TableCell>
                     <TableCell className="py-3 border-r">
                       <div className="flex items-center gap-2.5">
-                        <Avatar className="w-6 h-6">
-                          <AvatarImage src={item.logo} alt={item.brand} />
-                          <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                            {item.brand?.charAt(0) || 'B'}
-                          </AvatarFallback>
-                        </Avatar>
+                        <BrandAvatar
+                          brandName={item.brand}
+                          logoUrl={item.logo}
+                          size="md"
+                        />
                         <span className="text-sm font-medium">{item.brand}</span>
                       </div>
                     </TableCell>
@@ -226,7 +270,7 @@ const RankingPage = () => {
                       {item.visibility}
                     </TableCell>
                     <TableCell className="text-right py-3 border-r">
-                      {typeof item.sentiment === "number" ? (
+                      {typeof item.sentiment === "number" && item.sentiment !== null ? (
                         <div className="flex items-center justify-end gap-1">
                           <div className="w-0.5 h-3.5 bg-green-500 rounded"></div>
                           <span className="text-sm font-medium text-green-600">
@@ -238,7 +282,7 @@ const RankingPage = () => {
                       )}
                     </TableCell>
                     <TableCell className="text-right text-sm font-medium pr-6 py-3">
-                    {item.position}
+                      {item.position || <span className="text-muted-foreground">—</span>}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -56,6 +56,7 @@ import { incrementTagMentions } from "@/store/slices/tagsSlice";
 import { 
   fetchActivePrompts,
   fetchInactivePrompts,
+  fetchSuggestedPrompts,
   createPrompt,
   updatePromptTags,
   deactivatePrompts as deactivatePromptsThunk,
@@ -87,6 +88,7 @@ const PromptsPage = () => {
   const suggestedPrompts = useAppSelector((state) => state.prompts.suggestedPrompts);
   const loading = useAppSelector((state) => state.prompts.loading);
   const isAddingPrompt = useAppSelector((state) => state.prompts.isAddingPrompt);
+  const isGeneratingSuggestions = useAppSelector((state) => state.prompts.isGeneratingSuggestions);
   const selectedPromptIds = useAppSelector((state) => state.prompts.selectedPromptIds);
   const selectedInactiveIds = useAppSelector((state) => state.prompts.selectedInactiveIds);
   
@@ -124,7 +126,11 @@ const PromptsPage = () => {
   useEffect(() => {
     dispatch(fetchActivePrompts());
     dispatch(fetchInactivePrompts());
-  }, [dispatch]);
+    // Only load suggested prompts if we don't have any yet
+    if (suggestedPrompts.length === 0) {
+      dispatch(fetchSuggestedPrompts());
+    }
+  }, [dispatch, suggestedPrompts.length]);
 
 
   const handleExport = () => {
@@ -136,7 +142,11 @@ const PromptsPage = () => {
     
     // Check if there are prompts to export
     if (promptsToExport.length === 0) {
-      alert("No prompts to export");
+      toast({
+        title: "No prompts to export",
+        description: "There are no prompts available to export.",
+        variant: "destructive",
+      });
       return;
     }
     
@@ -182,7 +192,11 @@ const PromptsPage = () => {
 
   const handleAddPrompt = async () => {
     if (!newPromptText.trim()) {
-      alert("Please enter a prompt");
+      toast({
+        title: "Prompt required",
+        description: "Please enter a prompt text.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -223,10 +237,17 @@ const PromptsPage = () => {
       await dispatch(fetchActivePrompts()).unwrap();
 
       // Show success message
-      alert("Prompt added successfully!");
+      toast({
+        title: "Prompt added",
+        description: "Your prompt has been added successfully!",
+      });
     } catch (error) {
       console.error("Error adding prompt:", error);
-      alert("Failed to add prompt. Please try again.");
+      toast({
+        title: "Failed to add prompt",
+        description: "Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -262,13 +283,20 @@ const PromptsPage = () => {
         );
       }
 
-      alert("Tags updated successfully!");
+      toast({
+        title: "Tags updated",
+        description: "Tags have been updated successfully!",
+      });
       setTagDialogOpen(false);
       setCurrentPromptForTag(null);
       setTagsToAssign([]);
     } catch (error) {
       console.error("Error updating tags:", error);
-      alert("Failed to update tags. Please try again.");
+      toast({
+        title: "Failed to update tags",
+        description: "Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -293,6 +321,23 @@ const PromptsPage = () => {
       setInactiveSortOrder("asc"); // Second click: oldest first
     } else {
       setInactiveSortOrder(null); // Third click: reset to default
+    }
+  };
+
+  const handleSuggestMore = async () => {
+    try {
+      await dispatch(fetchSuggestedPrompts()).unwrap();
+      toast({
+        title: "More suggestions loaded",
+        description: "New suggested prompts have been added!",
+      });
+    } catch (error) {
+      console.error("Error fetching more suggestions:", error);
+      toast({
+        title: "Failed to load suggestions",
+        description: "Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -332,7 +377,10 @@ const PromptsPage = () => {
   };
 
   const handleAssignTags = () => {
-    alert(`Assign tags to ${selectedPromptIds.length} selected prompt(s)`);
+    toast({
+      title: "Assign tags",
+      description: `Assign tags to ${selectedPromptIds.length} selected prompt(s)`,
+    });
   };
 
   const handleDeactivate = () => {
@@ -383,7 +431,10 @@ const PromptsPage = () => {
   };
 
   const handleAssignTagsInactive = () => {
-    alert(`Assign tags to ${selectedInactiveIds.length} selected prompt(s)`);
+    toast({
+      title: "Assign tags",
+      description: `Assign tags to ${selectedInactiveIds.length} selected prompt(s)`,
+    });
   };
 
   const handleActivate = () => {
@@ -435,7 +486,11 @@ const PromptsPage = () => {
 
   const handleFileUpload = (file: File) => {
     if (!file.name.endsWith(".csv")) {
-      alert("Please upload a CSV file");
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a CSV file.",
+        variant: "destructive",
+      });
       return;
     }
     setUploadedFile(file);
@@ -486,7 +541,11 @@ const PromptsPage = () => {
 
   const processBulkUpload = async () => {
     if (!uploadedFile) {
-      alert("Please select a file first");
+      toast({
+        title: "No file selected",
+        description: "Please select a CSV file first.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -500,7 +559,11 @@ const PromptsPage = () => {
         .filter((line) => line);
 
       if (lines.length === 0) {
-        alert("The CSV file is empty.");
+        toast({
+          title: "Empty file",
+          description: "The CSV file is empty.",
+          variant: "destructive",
+        });
         return;
       }
 
@@ -555,7 +618,11 @@ const PromptsPage = () => {
       console.log("Parsed prompts:", prompts);
 
       if (prompts.length === 0) {
-        alert("No valid prompts found. Make sure your CSV has prompts in the first column.");
+        toast({
+          title: "No valid prompts",
+          description: "Make sure your CSV has prompts in the first column.",
+          variant: "destructive",
+        });
         return;
       }
 
@@ -566,12 +633,19 @@ const PromptsPage = () => {
         }
       }
 
-      alert(`Successfully added ${prompts.length} prompts`);
+      toast({
+        title: "Prompts added",
+        description: `Successfully added ${prompts.length} prompt(s) from CSV.`,
+      });
       setUploadedFile(null);
       setAddDialogOpen(false);
     } catch (error) {
       console.error("CSV processing error:", error);
-      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast({
+        title: "CSV processing failed",
+        description: error instanceof Error ? error.message : 'Unknown error occurred.',
+        variant: "destructive",
+      });
     }
   };
 
@@ -943,8 +1017,21 @@ const PromptsPage = () => {
                   presence with suggested prompts.
                 </span>
               </div>
-              <Button variant="outline" size="sm" className="bg-white h-8">
-                Suggest more
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="bg-white h-8"
+                onClick={handleSuggestMore}
+                disabled={isGeneratingSuggestions}
+              >
+                {isGeneratingSuggestions ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  "Suggest more"
+                )}
               </Button>
             </div>
 
@@ -974,50 +1061,81 @@ const PromptsPage = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredSuggestedPrompts.map((prompt) => (
-                      <TableRow key={prompt.id} className="hover:bg-muted/50">
-                        <TableCell className="py-3">
-                          <button
-                            onClick={() => {
-                              console.log(
-                                "Navigating to prompt (suggested):",
-                                prompt.id
-                              );
-                              navigate(`/dashboard/prompts/${prompt.id}`);
-                            }}
-                            className="text-sm text-left hover:text-blue-600 hover:underline transition-colors cursor-pointer"
-                          >
-                            {prompt.prompt}
-                          </button>
-                        </TableCell>
-                        <TableCell className="text-center py-3">
-                          <span className="text-sm font-medium">
-                            {prompt.volumeValue
-                              ? prompt.volumeValue.toLocaleString()
-                              : "0"}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-center py-3">
-                          <span className="text-sm text-muted-foreground">
-                            {prompt.suggestedAt}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right py-3">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 text-xs"
-                            >
-                              Reject
-                            </Button>
-                            <Button className="bg-black hover:bg-black/90 text-white h-8 text-xs">
-                              Track
-                            </Button>
-                          </div>
+                    {isGeneratingSuggestions && filteredSuggestedPrompts.length === 0 ? (
+                      Array.from({ length: 3 }).map((_, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="py-3">
+                            <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <div className="h-4 bg-gray-200 rounded animate-pulse mx-auto w-16"></div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <div className="h-4 bg-gray-200 rounded animate-pulse mx-auto w-20"></div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
+                              <div className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : filteredSuggestedPrompts.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          className="text-center py-12 text-muted-foreground"
+                        >
+                          No suggested prompts available yet. Click "Suggest more" to generate some!
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      filteredSuggestedPrompts.map((prompt) => (
+                        <TableRow key={prompt.id} className="hover:bg-muted/50">
+                          <TableCell className="py-3">
+                            <button
+                              onClick={() => {
+                                console.log(
+                                  "Navigating to prompt (suggested):",
+                                  prompt.id
+                                );
+                                navigate(`/dashboard/prompts/${prompt.id}`);
+                              }}
+                              className="text-sm text-left hover:text-blue-600 hover:underline transition-colors cursor-pointer"
+                            >
+                              {prompt.prompt}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-center py-3">
+                            <span className="text-sm font-medium">
+                              {prompt.volumeValue
+                                ? prompt.volumeValue.toLocaleString()
+                                : "0"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center py-3">
+                            <span className="text-sm text-muted-foreground">
+                              {prompt.suggestedAt ? getTimeAgo(prompt.suggestedAt) : "—"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs"
+                              >
+                                Reject
+                              </Button>
+                              <Button className="bg-black hover:bg-black/90 text-white h-8 text-xs">
+                                Track
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -1405,10 +1523,26 @@ const PromptsPage = () => {
                   >
                     <SelectTrigger id="country">
                       <SelectValue>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">🇮🇳</span>
-                          <span>India</span>
-                        </div>
+                        {selectedCountry && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">
+                              {selectedCountry === "IN" && "🇮🇳"}
+                              {selectedCountry === "US" && "🇺🇸"}
+                              {selectedCountry === "GB" && "🇬🇧"}
+                              {selectedCountry === "CA" && "🇨🇦"}
+                              {selectedCountry === "AU" && "🇦🇺"}
+                              {selectedCountry === "DE" && "🇩🇪"}
+                            </span>
+                            <span>
+                              {selectedCountry === "IN" && "India"}
+                              {selectedCountry === "US" && "United States"}
+                              {selectedCountry === "GB" && "United Kingdom"}
+                              {selectedCountry === "CA" && "Canada"}
+                              {selectedCountry === "AU" && "Australia"}
+                              {selectedCountry === "DE" && "Germany"}
+                            </span>
+                          </div>
+                        )}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
@@ -1428,6 +1562,24 @@ const PromptsPage = () => {
                         <div className="flex items-center gap-2">
                           <span className="text-lg">🇬🇧</span>
                           <span>United Kingdom</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="CA">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇨🇦</span>
+                          <span>Canada</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="AU">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇦🇺</span>
+                          <span>Australia</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="DE">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇩🇪</span>
+                          <span>Germany</span>
                         </div>
                       </SelectItem>
                     </SelectContent>

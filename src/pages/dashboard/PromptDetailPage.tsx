@@ -48,7 +48,7 @@ import { Download, ArrowRight, Eye, Users, Globe, Globe2, MessageSquare, User, B
 
 // Helper function to get country flag emoji
 const getCountryFlag = (location: string): string => {
-  if (!location) return '🇮🇳'; // Default to India
+  if (!location) return '🌐'; // Default to globe for unknown location
   
   const loc = location.toLowerCase();
   

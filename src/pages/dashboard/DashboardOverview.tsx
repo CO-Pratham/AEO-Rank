@@ -21,6 +21,14 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { BrandAvatar } from "@/components/ui/brand-avatar";
+import { UpgradeDialog } from "@/components/ui/upgrade-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -60,35 +68,56 @@ import {
   MessageSquare,
   User,
   Bot,
+  Info,
+  Lock,
+  Check,
+  ChevronDown,
 } from "lucide-react";
 import { LoadingScreen } from "@/components/ui/loading-spinner";
 import { getDomainLogo, generateInitials } from "@/utils/logoUtils";
 
+// AI Model Logos
+import ChatGPTIcon from "@/assets/logos/chatgpt-icon.svg";
+import ClaudeIcon from "@/assets/logos/claude-ai-icon.svg";
+import GeminiIcon from "@/assets/logos/google-gemini-icon.svg";
+import PerplexityIcon from "@/assets/logos/perplexity-ai-icon.svg";
+import GrokIcon from "@/assets/logos/grok-icon.svg";
+import CopilotIcon from "@/assets/logos/copilot-icon.svg";
+import MetaIcon from "@/assets/logos/meta-icon.svg";
+import GoogleAIStudioIcon from "@/assets/logos/google-ai-studio-icon.svg";
+import {
+  Tooltip as UITooltip,
+  TooltipContent as UITooltipContent,
+  TooltipProvider as UITooltipProvider,
+  TooltipTrigger as UITooltipTrigger,
+} from "@/components/ui/tooltip";
+
 // Helper function to get country flag emoji
 const getCountryFlag = (location: string): string => {
-  if (!location) return '🇮🇳'; // Default to India
+  if (!location) return '🌐'; // Default to globe for unknown location
   
-  const loc = location.toLowerCase();
+  const loc = location.toLowerCase().trim();
   
   // Map country names to flag emojis
-  if (loc.includes('india') || loc.includes('in')) return '🇮🇳';
-  if (loc.includes('united states') || loc.includes('usa') || loc.includes('us')) return '🇺🇸';
+  // Check more specific patterns first to avoid false matches
   if (loc.includes('united kingdom') || loc.includes('uk') || loc.includes('britain') || loc.includes('england')) return '🇬🇧';
-  if (loc.includes('canada') || loc.includes('ca')) return '🇨🇦';
-  if (loc.includes('australia') || loc.includes('au')) return '🇦🇺';
-  if (loc.includes('germany') || loc.includes('de')) return '🇩🇪';
-  if (loc.includes('france') || loc.includes('fr')) return '🇫🇷';
-  if (loc.includes('japan') || loc.includes('jp')) return '🇯🇵';
-  if (loc.includes('china') || loc.includes('cn')) return '🇨🇳';
-  if (loc.includes('brazil') || loc.includes('br')) return '🇧🇷';
-  if (loc.includes('mexico') || loc.includes('mx')) return '🇲🇽';
-  if (loc.includes('spain') || loc.includes('es')) return '🇪🇸';
-  if (loc.includes('italy') || loc.includes('it')) return '🇮🇹';
-  if (loc.includes('russia') || loc.includes('ru')) return '🇷🇺';
-  if (loc.includes('singapore') || loc.includes('sg')) return '🇸🇬';
-  if (loc.includes('netherlands') || loc.includes('nl')) return '🇳🇱';
-  if (loc.includes('sweden') || loc.includes('se')) return '🇸🇪';
-  if (loc.includes('switzerland') || loc.includes('ch')) return '🇨🇭';
+  if (loc.includes('united states') || loc.includes('usa') || loc.includes('us')) return '🇺🇸';
+  if (loc.includes('india') || loc === 'in') return '🇮🇳'; // Only match exact 'in' to avoid matching words containing 'in'
+  if (loc.includes('canada') || loc === 'ca') return '🇨🇦';
+  if (loc.includes('australia') || loc === 'au') return '🇦🇺';
+  if (loc.includes('germany') || loc === 'de') return '🇩🇪';
+  if (loc.includes('france') || loc === 'fr') return '🇫🇷';
+  if (loc.includes('japan') || loc === 'jp') return '🇯🇵';
+  if (loc.includes('china') || loc === 'cn') return '🇨🇳';
+  if (loc.includes('brazil') || loc === 'br') return '🇧🇷';
+  if (loc.includes('mexico') || loc === 'mx') return '🇲🇽';
+  if (loc.includes('spain') || loc === 'es') return '🇪🇸';
+  if (loc.includes('italy') || loc === 'it') return '🇮🇹';
+  if (loc.includes('russia') || loc === 'ru') return '🇷🇺';
+  if (loc.includes('singapore') || loc === 'sg') return '🇸🇬';
+  if (loc.includes('netherlands') || loc === 'nl') return '🇳🇱';
+  if (loc.includes('sweden') || loc === 'se') return '🇸🇪';
+  if (loc.includes('switzerland') || loc === 'ch') return '🇨🇭';
   
   return '🌐'; // Generic globe for unknown countries
 };
@@ -307,6 +336,58 @@ const BRAND_COLORS = [
   "#38bdf8", // sky-400
 ];
 
+// AI Models Configuration
+const AI_MODELS = [
+  {
+    id: "chatgpt",
+    name: "ChatGPT",
+    icon: ChatGPTIcon,
+    locked: false,
+  },
+  {
+    id: "claude",
+    name: "Claude",
+    icon: ClaudeIcon,
+    locked: true,
+  },
+  {
+    id: "gemini",
+    name: "Gemini",
+    icon: GeminiIcon,
+    locked: true,
+  },
+  {
+    id: "perplexity",
+    name: "Perplexity AI",
+    icon: PerplexityIcon,
+    locked: true,
+  },
+  {
+    id: "grok",
+    name: "Grok",
+    icon: GrokIcon,
+    locked: true,
+  },
+  {
+    id: "copilot",
+    name: "Microsoft Copilot",
+    icon: CopilotIcon,
+    locked: true,
+  },
+  {
+    id: "meta",
+    name: "Meta AI",
+    icon: MetaIcon,
+    locked: true,
+  },
+  {
+    id: "google-ai",
+    name: "Google AI Studio",
+    icon: GoogleAIStudioIcon,
+    locked: true,
+  },
+];
+
 const DashboardOverview = () => {
   const navigate = useNavigate();
   const { competitors, loading: competitorsLoading } = useSelector(
@@ -321,7 +402,9 @@ const DashboardOverview = () => {
   } = useSources();
   const { brand, loading: brandLoading, error: brandError } = useBrand();
   const [timeRange, setTimeRange] = useState("7d");
-  const [selectedModel, setSelectedModel] = useState("all");
+  const [selectedModel, setSelectedModel] = useState("chatgpt");
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [selectedLockedModel, setSelectedLockedModel] = useState("");
   const [hoveredPieData, setHoveredPieData] = useState<any>(null);
   const [visibilityData, setVisibilityData] = useState<any[]>([]);
   const [competitorVisibilityData, setCompetitorVisibilityData] = useState<
@@ -387,20 +470,29 @@ const DashboardOverview = () => {
         console.log("✅ Processing competitor data...");
         console.log("Analysis data count:", data.length);
         console.log("User competitors count:", userCompetitors.length);
-        // Create a set of unique dates from API, or use today if no data
-        const uniqueDates =
-          Array.isArray(data) && data.length > 0
-            ? Array.from(
-                new Set(
-                  data.map(
-                    (item: any) =>
-                      item.date ||
-                      item.timestamp ||
-                      new Date().toISOString().split("T")[0]
-                  )
-                )
-              ).sort()
-            : [new Date().toISOString().split("T")[0]];
+        
+        // Generate proper date range based on timeRange selection
+        const getDaysCount = () => {
+          switch (timeRange) {
+            case "7d": return 7;
+            case "14d": return 14;
+            case "30d": return 30;
+            default: return 7;
+          }
+        };
+        
+        const daysCount = getDaysCount();
+        const today = new Date();
+        const uniqueDates: string[] = [];
+        
+        // Generate all dates in the range (from oldest to newest)
+        for (let i = daysCount - 1; i >= 0; i--) {
+          const date = new Date(today);
+          date.setDate(today.getDate() - i);
+          uniqueDates.push(date.toISOString().split("T")[0]);
+        }
+        
+        console.log(`📅 Generated date range for ${timeRange}:`, uniqueDates);
 
         // Get all unique brands from both analysis data AND user competitors
         const brandsFromAnalysis =
@@ -466,16 +558,28 @@ const DashboardOverview = () => {
         const allCompetitorsForDisplay = new Map();
 
         // Add user competitors first (these are guaranteed to be tracked)
-        if (Array.isArray(userCompetitors) && userCompetitors.length > 0) {
-          userCompetitors.forEach((userComp: any) => {
-            const brandName =
-              userComp.brand_name || userComp.name || userComp.brand;
+        // Use Redux competitors for consistent domain values
+        if (Array.isArray(competitors) && competitors.length > 0) {
+          competitors.forEach((userComp: any) => {
+            const brandName = userComp.name || userComp.brand_name || userComp.brand;
             if (brandName) {
               const analysisItem = analysisMap.get(brandName.toLowerCase());
-              const domain =
-                userComp.domain ||
-                userComp.website ||
-                `${brandName.toLowerCase().replace(/\s+/g, "")}.com`;
+              
+              // Use domain from Redux store (source of truth from CompetitorsPage)
+              let domain = userComp.domain || userComp.website || "";
+              
+              // Clean domain if it exists
+              if (domain) {
+                domain = domain
+                  .replace(/^https?:\/\//i, "")
+                  .replace(/^www\./i, "")
+                  .replace(/\/.*$/, "");
+              }
+              
+              // Only fallback to .com if no domain at all
+              if (!domain) {
+                domain = `${brandName.toLowerCase().replace(/\s+/g, "")}.com`;
+              }
 
               allCompetitorsForDisplay.set(brandName.toLowerCase(), {
                 brand_name: brandName,
@@ -506,13 +610,8 @@ const DashboardOverview = () => {
           });
         }
 
-        // Convert to array, filter out 0% visibility brands, and sort
+        // Convert to array, include ALL brands (even with 0% visibility), and sort
         const competitorData = Array.from(allCompetitorsForDisplay.values())
-          .filter((item) => {
-            // Only include brands with visibility > 0%
-            const visibility = Number(item.avg_visibility) || 0;
-            return visibility > 0;
-          })
           .sort((a, b) => {
             // Primary sort: visibility (descending)
             const visibilityA = Number(a.avg_visibility) || 0;
@@ -545,15 +644,19 @@ const DashboardOverview = () => {
                 .replace(/\/.*$/, "");
             }
 
+            const visibility = Number(item.avg_visibility) || 0;
+            const hasVisibility = visibility > 0;
+
             return {
               id: index + 1,
               brand: item.brand_name,
-              logo: getDomainLogo(domain, item.logo),
-              visibility: `${Math.round(Number(item.avg_visibility) || 0)}%`,
-              sentiment: Number.isFinite(Number(item.avg_sentiment))
+              domain: domain,
+              logo: getDomainLogo(domain, item.logo, item.brand_name),
+              visibility: `${Math.round(visibility)}%`,
+              sentiment: hasVisibility && Number.isFinite(Number(item.avg_sentiment))
                 ? Math.round(Number(item.avg_sentiment))
-                : undefined,
-              position: `#${index + 1}`,
+                : null,
+              position: hasVisibility ? `#${index + 1}` : null,
               color: BRAND_COLORS[index % BRAND_COLORS.length],
               isUserCompetitor: item.isUserCompetitor,
             };
@@ -643,7 +746,7 @@ const DashboardOverview = () => {
     return {
       id: comp.id,
       brand: comp.name,
-      logo: getDomainLogo(domain, comp.logo),
+      logo: getDomainLogo(domain, comp.logo, comp.name),
       visibility: comp.visibility || "0%",
       sentiment: comp.sentiment,
       position: comp.position || "#1",
@@ -663,7 +766,9 @@ const DashboardOverview = () => {
     }
   };
 
-  if (sourcesLoading || brandLoading) {
+  // Only show loading screen if BOTH are still loading (initial load)
+  // This prevents indefinite loading if one API fails or returns quickly
+  if (sourcesLoading && brandLoading) {
     return <LoadingScreen text="Loading dashboard data..." />;
   }
 
@@ -686,17 +791,56 @@ const DashboardOverview = () => {
               <SelectItem value="30d">Last 30 days</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={selectedModel} onValueChange={setSelectedModel}>
-            <SelectTrigger className="w-[140px] h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Models</SelectItem>
-              <SelectItem value="chatgpt">ChatGPT</SelectItem>
-              <SelectItem value="claude">Claude</SelectItem>
-              <SelectItem value="gemini">Gemini</SelectItem>
-            </SelectContent>
-          </Select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-[200px] h-9 justify-between font-normal"
+              >
+                <div className="flex items-center gap-2">
+                  <img
+                    src={AI_MODELS.find(m => m.id === selectedModel)?.icon}
+                    alt={AI_MODELS.find(m => m.id === selectedModel)?.name}
+                    className="w-4 h-4"
+                  />
+                  <span>{AI_MODELS.find(m => m.id === selectedModel)?.name}</span>
+                </div>
+                <ChevronDown className="h-4 w-4 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[200px]">
+              {AI_MODELS.map((model) => (
+                <DropdownMenuItem
+                  key={model.id}
+                  onClick={() => {
+                    if (model.locked) {
+                      setSelectedLockedModel(model.name);
+                      setShowUpgradeDialog(true);
+                    } else {
+                      setSelectedModel(model.id);
+                    }
+                  }}
+                  className="cursor-pointer flex items-center justify-between py-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={model.icon}
+                      alt={model.name}
+                      className="w-4 h-4"
+                    />
+                    <span className={model.locked ? "text-muted-foreground" : ""}>
+                      {model.name}
+                    </span>
+                  </div>
+                  {model.locked ? (
+                    <Lock className="h-3 w-3 text-muted-foreground" />
+                  ) : selectedModel === model.id ? (
+                    <Check className="h-4 w-4 text-primary" />
+                  ) : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -764,6 +908,10 @@ const DashboardOverview = () => {
                   tick={{ fill: "#9ca3af", fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
+                  tickFormatter={(value) => {
+                    const date = new Date(value);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  }}
                 />
                 <YAxis
                   tick={{ fill: "#9ca3af", fontSize: 11 }}
@@ -774,6 +922,14 @@ const DashboardOverview = () => {
                 <Tooltip
                   contentStyle={{ fontSize: 12 }}
                   formatter={(value) => `${value}%`}
+                  labelFormatter={(label) => {
+                    const date = new Date(label);
+                    return date.toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric',
+                      year: 'numeric'
+                    });
+                  }}
                 />
                 {competitorVisibilityData.length > 0
                   ? competitorVisibilityData.map((competitor, index) => {
@@ -870,13 +1026,61 @@ const DashboardOverview = () => {
                           Brand
                         </TableHead>
                         <TableHead className="text-xs font-medium text-muted-foreground text-right pr-4 border-r">
-                          Visibility
+                          <div className="flex items-center justify-end gap-1">
+                            <span>Visibility</span>
+                            <UITooltipProvider delayDuration={0}>
+                              <UITooltip>
+                                <UITooltipTrigger asChild>
+                                  <button className="inline-flex items-center justify-center cursor-pointer">
+                                    <Info className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                                  </button>
+                                </UITooltipTrigger>
+                                <UITooltipContent side="top" className="max-w-xs bg-white border-gray-200">
+                                  <p className="text-xs text-gray-700">
+                                    Percentage of AI conversations where this brand was mentioned in the response
+                                  </p>
+                                </UITooltipContent>
+                              </UITooltip>
+                            </UITooltipProvider>
+                          </div>
                         </TableHead>
                         <TableHead className="text-xs font-medium text-muted-foreground text-right pr-4 border-r">
-                          Sentiment
+                          <div className="flex items-center justify-end gap-1">
+                            <span>Sentiment</span>
+                            <UITooltipProvider delayDuration={0}>
+                              <UITooltip>
+                                <UITooltipTrigger asChild>
+                                  <button className="inline-flex items-center justify-center cursor-pointer">
+                                    <Info className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                                  </button>
+                                </UITooltipTrigger>
+                                <UITooltipContent side="top" className="max-w-xs bg-white border-gray-200">
+                                  <p className="text-xs text-gray-700">
+                                    Average sentiment score (0-100) indicating how positively the brand is mentioned
+                                  </p>
+                                </UITooltipContent>
+                              </UITooltip>
+                            </UITooltipProvider>
+                          </div>
                         </TableHead>
                         <TableHead className="text-xs font-medium text-muted-foreground text-right pr-6">
-                          Position
+                          <div className="flex items-center justify-end gap-1">
+                            <span>Position</span>
+                            <UITooltipProvider delayDuration={0}>
+                              <UITooltip>
+                                <UITooltipTrigger asChild>
+                                  <button className="inline-flex items-center justify-center cursor-pointer">
+                                    <Info className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                                  </button>
+                                </UITooltipTrigger>
+                                <UITooltipContent side="top" className="max-w-xs bg-white border-gray-200">
+                                  <p className="text-xs text-gray-700">
+                                    Ranking position based on visibility percentage. Higher visibility = better position
+                                  </p>
+                                </UITooltipContent>
+                              </UITooltip>
+                            </UITooltipProvider>
+                          </div>
                         </TableHead>
                       </TableRow>
                     </TableHeader>
@@ -897,21 +1101,13 @@ const DashboardOverview = () => {
                             </TableCell>
                             <TableCell className="py-3 border-r">
                               <div className="flex items-center gap-2.5">
-                                <Avatar className="w-6 h-6">
-                                  <AvatarImage
-                                    src={competitor.logo}
-                                    alt={competitor.brand}
-                                  />
-                                  <AvatarFallback
-                                    className={`text-xs font-semibold ${
-                                      isOurBrand
-                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
-                                        : "bg-primary/10 text-primary"
-                                    }`}
-                                  >
-                                    {competitor.brand?.charAt(0) || "C"}
-                                  </AvatarFallback>
-                                </Avatar>
+                                <BrandAvatar
+                                  brandName={competitor.brand}
+                                  domain={competitor.domain}
+                                  logoUrl={competitor.logo}
+                                  size="md"
+                                  highlighted={isOurBrand}
+                                />
                                 <span
                                   className={`text-sm font-medium ${
                                     isOurBrand
@@ -927,7 +1123,7 @@ const DashboardOverview = () => {
                               {competitor.visibility}
                             </TableCell>
                             <TableCell className="text-right pr-4 py-3 border-r">
-                              {typeof competitor.sentiment === "number" ? (
+                              {competitor.sentiment !== null && typeof competitor.sentiment === "number" ? (
                                 <div className="flex items-center justify-end gap-1">
                                   <div className="w-0.5 h-3.5 bg-green-500 rounded"></div>
                                   <span className="text-sm font-medium text-green-600">
@@ -941,7 +1137,11 @@ const DashboardOverview = () => {
                               )}
                             </TableCell>
                             <TableCell className="text-right text-sm font-medium pr-6 py-3">
-                              {competitor.position}
+                              {competitor.position !== null ? (
+                                competitor.position
+                              ) : (
+                                <span className="text-sm text-muted-foreground">—</span>
+                              )}
                             </TableCell>
                           </TableRow>
                         );
@@ -1492,6 +1692,13 @@ const DashboardOverview = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Upgrade Dialog for Locked Models */}
+      <UpgradeDialog
+        isOpen={showUpgradeDialog}
+        onClose={() => setShowUpgradeDialog(false)}
+        featureName={selectedLockedModel}
+      />
     </div>
   );
 };

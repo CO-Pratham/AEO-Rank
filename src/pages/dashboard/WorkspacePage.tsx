@@ -16,7 +16,6 @@ import { useWorkspace } from "@/context/WorkspaceContext";
 import { useBrand } from "@/context/BrandContext";
 import { useToast } from "@/hooks/use-toast";
 import { useSearchParams } from "react-router-dom";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +26,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import PricingSection from "@/components/PricingSection";
 import { apiCall } from "@/utils/api";
 
 import chatgptIcon from "@/assets/logos/chatgpt-icon.svg";
@@ -42,8 +40,6 @@ const WorkspacePage = () => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const isNewWorkspace = searchParams.get('new') === 'true';
-  const isLocked = searchParams.get('locked') === '1';
-  const [showPricing, setShowPricing] = useState(isLocked);
   
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
@@ -126,11 +122,6 @@ const WorkspacePage = () => {
     }
   }, [currentWorkspace, isNewWorkspace, brand, brandLoading]);
 
-  useEffect(() => {
-    if (isLocked) {
-      setShowPricing(true);
-    }
-  }, [isLocked]);
 
   const handleModelToggle = (modelKey: string) => {
     setModels((prev) => ({
@@ -520,30 +511,7 @@ const WorkspacePage = () => {
         </CardContent>
       </Card>
 
-      {/* Pricing Popup (Pro upgrade) */}
-      <Dialog open={showPricing} onOpenChange={setShowPricing}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden">
-          <div className="bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 px-6 py-5 text-white">
-            <DialogHeader>
-              <DialogTitle className="text-xl">Unlock Multiple Workspaces</DialogTitle>
-              <DialogDescription className="text-white/80">
-                This feature is available on Pro plans. Choose a plan below to continue.
-              </DialogDescription>
-            </DialogHeader>
-          </div>
-          <div className="px-6 py-5">
-            <div className="rounded-xl border border-border/50 bg-background">
-              <div className="p-4 sm:p-6 max-h-[60vh] overflow-auto">
-                <PricingSection />
-              </div>
-              <div className="flex items-center justify-end gap-3 border-t border-border/50 px-4 sm:px-6 py-4">
-                <Button variant="outline" onClick={() => setShowPricing(false)}>Maybe later</Button>
-                <Button onClick={() => window.location.assign('/dashboard/subscription')}>Go to Billing</Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Removed old pricing popup - now using PricingPopup component from workspace dropdown */}
 
       {/* Edit Warning Dialog */}
       <AlertDialog open={showEditWarning} onOpenChange={setShowEditWarning}>
