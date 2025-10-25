@@ -6,50 +6,49 @@
   NODE_VERSION = "18"
   NPM_FLAGS = "--production=false"
 
-# Serve static files directly (assets, JS, CSS)
+# SPA routing - only redirect specific routes, let Netlify handle static files naturally
 [[redirects]]
-  from = "/assets/*"
-  to = "/assets/:splat"
+  from = "/dashboard/*"
+  to = "/index.html"
   status = 200
 
 [[redirects]]
-  from = "/*.js"
-  to = "/:splat.js"
+  from = "/login"
+  to = "/index.html"
   status = 200
 
 [[redirects]]
-  from = "/*.css"
-  to = "/:splat.css"
+  from = "/signup"
+  to = "/index.html"
   status = 200
 
 [[redirects]]
-  from = "/*.png"
-  to = "/:splat.png"
+  from = "/onboarding"
+  to = "/index.html"
   status = 200
 
 [[redirects]]
-  from = "/*.jpg"
-  to = "/:splat.jpg"
+  from = "/agency"
+  to = "/index.html"
   status = 200
 
 [[redirects]]
-  from = "/*.jpeg"
-  to = "/:splat.jpeg"
+  from = "/pricing"
+  to = "/index.html"
   status = 200
 
 [[redirects]]
-  from = "/*.svg"
-  to = "/:splat.svg"
+  from = "/demo"
+  to = "/index.html"
   status = 200
 
 [[redirects]]
-  from = "/*.ico"
-  to = "/:splat.ico"
+  from = "/blog/*"
+  to = "/index.html"
   status = 200
 
-# SPA routing - redirect all other routes to index.html
 [[redirects]]
-  from = "/*"
+  from = "/contact"
   to = "/index.html"
   status = 200
 
