@@ -135,15 +135,14 @@ export const BrandProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [reduxBrand]);
 
   useEffect(() => {
-    // Only fetch if user is authenticated AND on a dashboard route AND no Redux brand data
+    // Only fetch if user is authenticated AND no Redux brand data
     const token = localStorage.getItem('accessToken');
-    const isDashboardRoute = window.location.pathname.startsWith('/dashboard');
     
-    if (token && isDashboardRoute && !reduxBrand) {
+    if (token && !reduxBrand) {
       console.log('🔄 BrandContext: Fetching brand data from API...');
       fetchBrand();
-    } else if (!token || !isDashboardRoute) {
-      console.log('⏹️ BrandContext: Not on dashboard route or no token, stopping loading');
+    } else if (!token) {
+      console.log('⏹️ BrandContext: No token, stopping loading');
       setLoading(false);
     } else if (reduxBrand) {
       console.log('✅ BrandContext: Using Redux brand data, stopping loading');
