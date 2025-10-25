@@ -10,8 +10,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { X, ChevronLeft, ChevronRight, Check, Loader2, Sparkles } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Check, Loader2, Sparkles, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiCall } from "@/utils/api";
 import { useAppDispatch, useAppSelector } from "@/hooks/redux";
@@ -56,6 +69,8 @@ const OnboardingWizard = ({
   const [isProcessingNext, setIsProcessingNext] = useState(false);
   const [hasUserNavigatedToStep2, setHasUserNavigatedToStep2] = useState(false);
   const [hasUserNavigatedToStep3, setHasUserNavigatedToStep3] = useState(false);
+  const [countrySearchOpen, setCountrySearchOpen] = useState(false);
+  const [countrySearchValue, setCountrySearchValue] = useState("");
   const { toast } = useToast();
 
   const totalSteps = 3;
@@ -68,19 +83,117 @@ const OnboardingWizard = ({
     "Australia",
     "Germany",
     "India",
+    "France",
+    "Japan",
+    "China",
+    "Brazil",
+    "Mexico",
+    "Spain",
+    "Italy",
+    "Netherlands",
+    "Sweden",
+    "Switzerland",
+    "Singapore",
+    "South Korea",
+    "Saudi Arabia",
+    "United Arab Emirates",
+    "New Zealand",
+    "Ireland",
+    "Belgium",
+    "Austria",
+    "Poland",
+    "Norway",
+    "Denmark",
+    "Finland",
+    "Portugal",
+    "Greece",
   ];
 
-  // Helper function to get country flag
+  // Comprehensive helper function to get country flag
   const getCountryFlag = (country: string) => {
+    if (!country) return "🌐";
+    
+    const countryLower = country.toLowerCase().trim();
+    
+    // Comprehensive flag mapping
     const flagMap: Record<string, string> = {
-      "United States": "🇺🇸",
-      "United Kingdom": "🇬🇧",
-      "Canada": "🇨🇦",
-      "Australia": "🇦🇺",
-      "Germany": "🇩🇪",
-      "India": "🇮🇳",
+      // Popular countries
+      "united states": "🇺🇸", "usa": "🇺🇸", "us": "🇺🇸", "america": "🇺🇸",
+      "united kingdom": "🇬🇧", "uk": "🇬🇧", "britain": "🇬🇧", "england": "🇬🇧", "great britain": "🇬🇧",
+      "canada": "🇨🇦", "ca": "🇨🇦",
+      "australia": "🇦🇺", "au": "🇦🇺",
+      "germany": "🇩🇪", "de": "🇩🇪", "deutschland": "🇩🇪",
+      "india": "🇮🇳", "in": "🇮🇳", "bharat": "🇮🇳",
+      "france": "🇫🇷", "fr": "🇫🇷",
+      "japan": "🇯🇵", "jp": "🇯🇵",
+      "china": "🇨🇳", "cn": "🇨🇳", "prc": "🇨🇳",
+      "brazil": "🇧🇷", "br": "🇧🇷", "brasil": "🇧🇷",
+      "mexico": "🇲🇽", "mx": "🇲🇽",
+      "spain": "🇪🇸", "es": "🇪🇸", "españa": "🇪🇸",
+      "italy": "🇮🇹", "it": "🇮🇹", "italia": "🇮🇹",
+      "russia": "🇷🇺", "ru": "🇷🇺",
+      "south korea": "🇰🇷", "korea": "🇰🇷", "kr": "🇰🇷",
+      "netherlands": "🇳🇱", "nl": "🇳🇱", "holland": "🇳🇱",
+      "switzerland": "🇨🇭", "ch": "🇨🇭",
+      "sweden": "🇸🇪", "se": "🇸🇪",
+      "singapore": "🇸🇬", "sg": "🇸🇬",
+      "saudi arabia": "🇸🇦", "sa": "🇸🇦", "saudi": "🇸🇦",
+      "united arab emirates": "🇦🇪", "uae": "🇦🇪", "dubai": "🇦🇪",
+      "new zealand": "🇳🇿", "nz": "🇳🇿",
+      "ireland": "🇮🇪", "ie": "🇮🇪",
+      "belgium": "🇧🇪", "be": "🇧🇪",
+      "austria": "🇦🇹", "at": "🇦🇹",
+      "poland": "🇵🇱", "pl": "🇵🇱", "polska": "🇵🇱",
+      "norway": "🇳🇴", "no": "🇳🇴", "norge": "🇳🇴",
+      "denmark": "🇩🇰", "dk": "🇩🇰", "danmark": "🇩🇰",
+      "finland": "🇫🇮", "fi": "🇫🇮", "suomi": "🇫🇮",
+      "portugal": "🇵🇹", "pt": "🇵🇹",
+      "greece": "🇬🇷", "gr": "🇬🇷",
+      // Additional countries
+      "nigeria": "🇳🇬", "ng": "🇳🇬",
+      "south africa": "🇿🇦", "za": "🇿🇦",
+      "egypt": "🇪🇬", "eg": "🇪🇬",
+      "kenya": "🇰🇪", "ke": "🇰🇪",
+      "ghana": "🇬🇭", "gh": "🇬🇭",
+      "morocco": "🇲🇦", "ma": "🇲🇦",
+      "argentina": "🇦🇷", "ar": "🇦🇷",
+      "chile": "🇨🇱", "cl": "🇨🇱",
+      "colombia": "🇨🇴", "co": "🇨🇴",
+      "peru": "🇵🇪", "pe": "🇵🇪",
+      "venezuela": "🇻🇪", "ve": "🇻🇪",
+      "turkey": "🇹🇷", "tr": "🇹🇷", "türkiye": "🇹🇷",
+      "israel": "🇮🇱", "il": "🇮🇱",
+      "pakistan": "🇵🇰", "pk": "🇵🇰",
+      "bangladesh": "🇧🇩", "bd": "🇧🇩",
+      "indonesia": "🇮🇩", "id": "🇮🇩",
+      "thailand": "🇹🇭", "th": "🇹🇭",
+      "vietnam": "🇻🇳", "vn": "🇻🇳", "việt nam": "🇻🇳",
+      "philippines": "🇵🇭", "ph": "🇵🇭",
+      "malaysia": "🇲🇾", "my": "🇲🇾",
+      "taiwan": "🇹🇼", "tw": "🇹🇼",
+      "hong kong": "🇭🇰", "hk": "🇭🇰",
+      "czech republic": "🇨🇿", "cz": "🇨🇿", "czechia": "🇨🇿",
+      "romania": "🇷🇴", "ro": "🇷🇴",
+      "hungary": "🇭🇺", "hu": "🇭🇺",
+      "ukraine": "🇺🇦", "ua": "🇺🇦",
+      "croatia": "🇭🇷", "hr": "🇭🇷",
+      "bulgaria": "🇧🇬", "bg": "🇧🇬",
+      "slovakia": "🇸🇰", "sk": "🇸🇰",
+      "lithuania": "🇱🇹", "lt": "🇱🇹",
+      "latvia": "🇱🇻", "lv": "🇱🇻",
+      "estonia": "🇪🇪", "ee": "🇪🇪",
+      "slovenia": "🇸🇮", "si": "🇸🇮",
+      "luxembourg": "🇱🇺", "lu": "🇱🇺",
+      "iceland": "🇮🇸", "is": "🇮🇸",
+      "qatar": "🇶🇦", "qa": "🇶🇦",
+      "kuwait": "🇰🇼", "kw": "🇰🇼",
+      "bahrain": "🇧🇭", "bh": "🇧🇭",
+      "oman": "🇴🇲", "om": "🇴🇲",
+      "jordan": "🇯🇴", "jo": "🇯🇴",
+      "lebanon": "🇱🇧", "lb": "🇱🇧",
     };
-    return flagMap[country] || "🇺🇸";
+    
+    return flagMap[countryLower] || "🌐";
   };
 
 
@@ -514,7 +627,10 @@ const OnboardingWizard = ({
         description: "Your account has been set up successfully. Let's start optimizing your AI search presence!",
       });
 
-      onComplete(formData);
+      // Small delay to ensure Redux state is updated before navigation
+      setTimeout(() => {
+        onComplete(formData);
+      }, 100);
     } catch (error) {
       console.error("Error analyzing prompts:", error);
       
@@ -595,33 +711,90 @@ const OnboardingWizard = ({
                 <Label htmlFor="defaultLocation" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Country *
                 </Label>
-                <Select
-                  value={formData.defaultLocation}
-                  onValueChange={(value) =>
-                    dispatch(updateOnboardingData({ defaultLocation: value }))
-                  }
-                >
-                  <SelectTrigger className="h-10 text-sm">
-                    <SelectValue placeholder="Select your country">
-                      {formData.defaultLocation && (
+                
+                <Popover open={countrySearchOpen} onOpenChange={setCountrySearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={countrySearchOpen}
+                      className="w-full justify-between h-10 text-sm"
+                    >
+                      {formData.defaultLocation ? (
                         <span className="flex items-center gap-2">
                           <span>{getCountryFlag(formData.defaultLocation)}</span>
                           <span>{formData.defaultLocation}</span>
                         </span>
+                      ) : (
+                        "Select or enter your country"
                       )}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {defaultLocations.map((location) => (
-                      <SelectItem key={location} value={location} className="text-sm">
-                        <span className="flex items-center gap-2">
-                          <span>{getCountryFlag(location)}</span>
-                          <span>{location}</span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white border border-gray-200 shadow-lg" align="start" side="bottom">
+                    <Command>
+                      <CommandInput 
+                        placeholder="Search countries or type manually..." 
+                        value={countrySearchValue}
+                        onValueChange={setCountrySearchValue}
+                        className="border-0 focus:ring-0"
+                      />
+                      <CommandList className="max-h-[200px]">
+                        <CommandEmpty>
+                          <div className="py-6 text-center text-sm">
+                            <p className="text-gray-500 mb-2">No country found</p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                if (countrySearchValue.trim()) {
+                                  dispatch(updateOnboardingData({ defaultLocation: countrySearchValue.trim() }));
+                                  setCountrySearchOpen(false);
+                                  setCountrySearchValue("");
+                                }
+                              }}
+                              className="text-xs"
+                            >
+                              Add "{countrySearchValue}"
+                            </Button>
+                          </div>
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {defaultLocations
+                            .filter((location) =>
+                              location.toLowerCase().includes(countrySearchValue.toLowerCase())
+                            )
+                            .map((location) => (
+                              <CommandItem
+                                key={location}
+                                value={location}
+                                onSelect={(currentValue) => {
+                                  dispatch(updateOnboardingData({ defaultLocation: currentValue }));
+                                  setCountrySearchOpen(false);
+                                  setCountrySearchValue("");
+                                }}
+                                className="text-sm hover:bg-gray-50 cursor-pointer"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span>{getCountryFlag(location)}</span>
+                                  <span>{location}</span>
+                                </span>
+                                <Check
+                                  className={`ml-auto h-4 w-4 ${
+                                    formData.defaultLocation === location ? "opacity-100" : "opacity-0"
+                                  }`}
+                                />
+                              </CommandItem>
+                            ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Search from the list or type any country name manually
+                </p>
               </div>
             </div>
           </div>
@@ -842,55 +1015,56 @@ const OnboardingWizard = ({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {formData.prompts.length > 0 && (
-                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Your prompts ({formData.prompts.length})</Label>
-                  )}
-                  
-                  {/* Display added prompts from suggestions or custom */}
-                  {formData.prompts.map((prompt, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start gap-3 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-sm transition-shadow"
-                    >
-                      <div className="flex-shrink-0 mt-0.5">
-                        <span className="text-lg">{getCountryFlag(formData.defaultLocation)}</span>
-                      </div>
-                      <span className="flex-1 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                        {prompt}
-                      </span>
-                      <button
-                        onClick={() => removePrompt(prompt)}
-                        className="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-
-                  {/* Show suggested prompts that haven't been added yet */}
-                  {suggestedPromptsList.filter(p => !formData.prompts.includes(p)).length > 0 && (
+                  {/* Show all suggested prompts with strikethrough for selected ones */}
+                  {suggestedPromptsList.length > 0 && (
                     <>
-                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 pt-2">Suggested prompts</Label>
-                      {suggestedPromptsList.filter(p => !formData.prompts.includes(p)).map((prompt, index) => (
-                        <div
-                          key={`suggestion-${index}`}
-                          className="flex items-start gap-3 p-4 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-                          onClick={() => addPrompt(prompt)}
-                        >
-                          <div className="flex-shrink-0 mt-0.5">
-                            <span className="text-lg">{getCountryFlag(formData.defaultLocation)}</span>
-                          </div>
-                          <span className="flex-1 text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                            {prompt}
-                          </span>
-                        </div>
-                      ))}
+                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Suggested prompts (Click to select)</Label>
+                      <div className="space-y-2">
+                        {suggestedPromptsList.map((prompt, index) => {
+                          const isSelected = formData.prompts.includes(prompt);
+                          return (
+                            <div
+                              key={`suggestion-${index}`}
+                              className={`flex items-start gap-3 p-4 rounded-lg transition-all cursor-pointer border ${
+                                isSelected
+                                  ? 'bg-gray-100 dark:bg-gray-800/30 border-gray-300 dark:border-gray-600'
+                                  : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-300'
+                              }`}
+                              onClick={() => {
+                                if (isSelected) {
+                                  removePrompt(prompt);
+                                } else {
+                                  addPrompt(prompt);
+                                }
+                              }}
+                            >
+                              <div className="flex-shrink-0 mt-0.5">
+                                <span className={`text-lg ${isSelected ? 'opacity-50' : ''}`}>
+                                  {getCountryFlag(formData.defaultLocation)}
+                                </span>
+                              </div>
+                              <span className={`flex-1 text-sm leading-relaxed ${
+                                isSelected 
+                                  ? 'text-gray-400 dark:text-gray-500 line-through' 
+                                  : 'text-gray-600 dark:text-gray-400'
+                              }`}>
+                                {prompt}
+                              </span>
+                              {isSelected && (
+                                <div className="flex-shrink-0">
+                                  <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </>
                   )}
 
                   {/* Input for custom prompts */}
                   <div className="space-y-2 pt-2">
-                    <Label className="text-xs font-medium text-gray-700 dark:text-gray-300">Add custom prompt</Label>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Add custom prompt</Label>
                     <Textarea
                       placeholder="Enter your custom prompt"
                       value={tempInput}
@@ -903,7 +1077,7 @@ const OnboardingWizard = ({
                         }
                       }}
                       rows={2}
-                      className="resize-none text-xs"
+                      className="resize-none text-sm"
                     />
                     
                     <div className="flex items-center justify-end gap-2">
@@ -921,6 +1095,44 @@ const OnboardingWizard = ({
                       )}
                     </div>
                   </div>
+
+                  {/* Display all selected prompts below */}
+                  {formData.prompts.length > 0 && (
+                    <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Your selected prompts ({formData.prompts.length})
+                        </Label>
+                        {formData.prompts.length > 0 && (
+                          <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                            ✓ Ready to launch
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {formData.prompts.map((prompt, index) => (
+                          <div
+                            key={index}
+                            className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg"
+                          >
+                            <div className="flex-shrink-0 mt-0.5">
+                              <span className="text-base">{getCountryFlag(formData.defaultLocation)}</span>
+                            </div>
+                            <span className="flex-1 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                              {prompt}
+                            </span>
+                            <button
+                              onClick={() => removePrompt(prompt)}
+                              className="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors"
+                              title="Remove prompt"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

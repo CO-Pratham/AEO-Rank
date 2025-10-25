@@ -11,107 +11,100 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import OnboardingWizard from "@/components/onboarding/OnboardingWizard";
-import { checkUserStatus, testUserBrandAPI } from "@/utils/api";
+import { saveToken } from "@/utils/api";
 import { useAppDispatch } from "@/hooks/redux";
 import { loginSuccess } from "@/store/slices/authSlice";
 import { completeOnboarding } from "@/store/slices/onboardingSlice";
 
 const Login = () => {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
 
   const navigate = useNavigate();
   const { toast } = useToast();
   const dispatch = useAppDispatch();
 
-  const loginWithCredentials = async (
-    email: string,
-    password: string,
-    isDemo = false
-  ) => {
+  const handleEmailSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setLoading(true);
 
     try {
-      if (email === "demo@aeorank.com" && password === "demo123") {
-        // Demo login - create demo token and user
-        const demoToken = "demo_token_" + Date.now();
-        localStorage.setItem("accessToken", demoToken);
-        localStorage.setItem(
-          "aeorank_user",
-          JSON.stringify({
-            email: "demo@aeorank.com",
-            name: "Demo User",
-            avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=demo",
-          })
-        );
+      const response = await fetch(
+        "https://aeotest-production.up.railway.app/send-verify",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            baseurl: "http://localhost:8080",
+          }),
+        }
+      );
 
-        toast({
-          title: "Login Successful",
-          description: "Welcome back to AEORank!",
-        });
+      if (response.ok) {
+        const data = await response.json();
+        console.log("📧 Full login response:", JSON.stringify(data, null, 2));
 
-        // Update Redux auth state
-        dispatch(loginSuccess({ token: demoToken }));
+        if (data.accessToken) {
+          console.log("🔑 Access token received, saving and navigating");
+          saveToken(data.accessToken);
 
-        // For demo login, always set onboarding as completed and go to dashboard
-        if (isDemo) {
-          console.log("🎯 Demo login → Dashboard");
+          // Update Redux auth state
+          dispatch(loginSuccess({ token: data.accessToken }));
+
+          // 🎯 Navigate based on action field from API response (same logic as signup)
+          const action = data.action;
+          console.log("🎯 Login action:", action);
+
+          if (action === "login") {
+            // Existing user login - go to dashboard
+            console.log("✅ Login action detected → Dashboard");
+            localStorage.setItem("aeorank_onboarding_completed", "true");
+            dispatch(completeOnboarding());
+            navigate("/dashboard");
+            return;
+          } else if (action === "signup") {
+            // New user signup - go to onboarding
+            console.log("🆕 Signup action detected → Onboarding");
+            localStorage.removeItem("aeorank_onboarding_completed");
+            localStorage.removeItem("aeorank_onboarding_state");
+            navigate("/onboarding");
+            return;
+          }
+
+          // Fallback: If no action field, go to dashboard (assume existing user)
+          console.log("⚠️ No action field found → Dashboard");
           localStorage.setItem("aeorank_onboarding_completed", "true");
           dispatch(completeOnboarding());
           navigate("/dashboard");
         } else {
-          // Check user status for regular demo login
-          console.log("🔍 Checking demo user status");
-          await testUserBrandAPI(demoToken);
-          const userStatus = await checkUserStatus(demoToken);
-          console.log("👤 Demo user status:", userStatus);
-
-          if (userStatus.hasCompletedOnboarding) {
-            console.log("✅ Demo user has completed onboarding → Dashboard");
-            localStorage.setItem("aeorank_onboarding_completed", "true");
-            dispatch(completeOnboarding());
-            navigate("/dashboard");
-          } else {
-            console.log("🆕 Demo user needs onboarding → Show wizard");
-            setShowOnboarding(true);
-          }
+          setVerificationSent(true);
+          toast({
+            title: "Verification Email Sent",
+            description:
+              "Please check your email and click the verification link.",
+          });
         }
       } else {
+        const data = await response.json();
         toast({
-          title: "Login Failed",
-          description: "Invalid credentials. Use demo@aeorank.com / demo123",
+          title: "Error",
+          description: data.message || "Something went wrong",
           variant: "destructive",
         });
       }
-    } catch (error) {
-      console.error("Login error:", error);
+    } catch (err) {
       toast({
-        title: "Login Error",
-        description: "An error occurred during login. Please try again.",
+        title: "Error",
+        description: "Network error. Please try again.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  };
-
-  const fillDemoCredentials = () => {
-    setEmail("demo@aeorank.com");
-    setPassword("demo123");
-    loginWithCredentials("demo@aeorank.com", "demo123", true);
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    loginWithCredentials(email, password);
-  };
-
-  const handleOnboardingComplete = (data: any) => {
-    console.log("Onboarding completed with data:", data);
-    navigate("/dashboard");
   };
 
 
@@ -132,49 +125,35 @@ const Login = () => {
           <Card>
             <CardHeader>
               <CardTitle>Sign in to your account</CardTitle>
-              <CardDescription>
-                Enter your credentials to access your dashboard
-              </CardDescription>
+              <CardDescription>Enter your email to access your dashboard</CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="demo@aeorank.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
+              {verificationSent ? (
+                <div className="space-y-4">
+                  <p className="text-center text-green-600">
+                    Verification email sent! Check your inbox.
+                  </p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="demo123"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-3">
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Signing in..." : "Sign in"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={fillDemoCredentials}
-                    disabled={loading}
-                  >
-                    Try Demo Account
-                  </Button>
-                </div>
-              </form>
+              ) : (
+                <>
+                  <form onSubmit={handleEmailSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email Address</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {loading ? "Sending..." : "Magic Link"}
+                    </Button>
+                  </form>
+                </>
+              )}
 
               <div className="mt-6 text-center">
                 <p className="text-sm text-muted-foreground">
@@ -184,26 +163,10 @@ const Login = () => {
                   </Link>
                 </p>
               </div>
-
-              <div className="mt-4 p-3 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground text-center">
-                  <strong>Demo Credentials:</strong>
-                  <br />
-                  Email: demo@aeorank.com
-                  <br />
-                  Password: demo123
-                </p>
-              </div>
             </CardContent>
           </Card>
         </div>
       </div>
-
-      <OnboardingWizard
-        isOpen={showOnboarding}
-        onClose={() => setShowOnboarding(false)}
-        onComplete={handleOnboardingComplete}
-      />
     </>
   );
 };

@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store";
 import { apiCall } from "@/utils/api";
 
 interface Brand {
@@ -24,6 +26,9 @@ export const BrandProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [brand, setBrand] = useState<Brand | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Listen to Redux brand state changes
+  const reduxBrand = useSelector((state: RootState) => state.user.brand);
 
   const fetchBrand = async () => {
     try {
@@ -110,17 +115,41 @@ export const BrandProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // Sync Redux brand data with context state
   useEffect(() => {
-    // Only fetch if user is authenticated AND on a dashboard route
+    if (reduxBrand) {
+      console.log('🔄 BrandContext: Syncing Redux brand data:', reduxBrand);
+      const brandData: Brand = {
+        id: reduxBrand.name, // Use name as ID if no ID available
+        name: reduxBrand.name,
+        website: reduxBrand.website,
+        location: reduxBrand.location,
+        brand_name: reduxBrand.name,
+        domain: reduxBrand.website,
+        country: reduxBrand.location
+      };
+      setBrand(brandData);
+      setLoading(false);
+      setError(null);
+    }
+  }, [reduxBrand]);
+
+  useEffect(() => {
+    // Only fetch if user is authenticated AND on a dashboard route AND no Redux brand data
     const token = localStorage.getItem('accessToken');
     const isDashboardRoute = window.location.pathname.startsWith('/dashboard');
     
-    if (token && isDashboardRoute) {
+    if (token && isDashboardRoute && !reduxBrand) {
+      console.log('🔄 BrandContext: Fetching brand data from API...');
       fetchBrand();
-    } else {
+    } else if (!token || !isDashboardRoute) {
+      console.log('⏹️ BrandContext: Not on dashboard route or no token, stopping loading');
+      setLoading(false);
+    } else if (reduxBrand) {
+      console.log('✅ BrandContext: Using Redux brand data, stopping loading');
       setLoading(false);
     }
-  }, []);
+  }, [reduxBrand]);
 
   const refetch = () => {
     fetchBrand();

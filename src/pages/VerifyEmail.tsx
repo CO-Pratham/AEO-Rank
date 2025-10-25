@@ -60,54 +60,64 @@ const VerifyEmail = () => {
 
           // 🎯 Navigate based on action field from API response
           const action = data.action;
-          console.log("🎯 Email verification action:", action);
-          console.log("📋 Full verification data:", data);
+          console.log("🎯 Email verification action from backend:", action);
+          console.log("📋 Full verification data:", JSON.stringify(data, null, 2));
 
-          // Primary: Use action field from backend (most reliable)
-          if (action === "login") {
+          // PRIMARY CHECK: Use action field from backend (most reliable)
+          // Make comparison case-insensitive and trim whitespace
+          const normalizedAction = (action || "").toString().toLowerCase().trim();
+          console.log("🔍 Normalized action:", normalizedAction);
+
+          if (normalizedAction === "login") {
             // Existing user login - go to dashboard
-            console.log("✅ Login action detected → Dashboard");
+            console.log("✅ LOGIN action detected → Navigating to Dashboard");
             try {
               localStorage.setItem("aeorank_onboarding_completed", "true");
               dispatch(completeOnboarding());
-            } catch {}
+            } catch (e) {
+              console.error("Error setting onboarding complete:", e);
+            }
             navigate("/dashboard", { replace: true });
-            return;
-          } else if (action === "signup") {
+            return; // STOP HERE - Don't run any fallback logic
+          }
+          
+          if (normalizedAction === "signup") {
             // New user signup - go to onboarding
-            console.log("🆕 Signup action detected → Onboarding");
+            console.log("✅ SIGNUP action detected → Navigating to Onboarding");
             try {
               localStorage.removeItem("aeorank_onboarding_completed");
               localStorage.removeItem("aeorank_onboarding_state");
-            } catch {}
-            navigate("/onboarding");
-            return;
+            } catch (e) {
+              console.error("Error clearing onboarding:", e);
+            }
+            navigate("/onboarding", { replace: true });
+            return; // STOP HERE - Don't run any fallback logic
           }
 
-          // Secondary: Check if backend explicitly says it's a new user
+          // SECONDARY CHECK: Check if backend explicitly says it's a new user
           if (data.isNewUser === true || data.new_user === true || data.newUser === true) {
-            console.log("🆕 New user flag detected → Onboarding");
+            console.log("🆕 New user flag detected → Navigating to Onboarding");
             try {
               localStorage.removeItem("aeorank_onboarding_completed");
               localStorage.removeItem("aeorank_onboarding_state");
             } catch {}
-            navigate("/onboarding");
-            return;
+            navigate("/onboarding", { replace: true });
+            return; // STOP HERE
           }
 
-          // Tertiary: OAuth special handling
+          // TERTIARY CHECK: OAuth special handling
           if (isOAuth) {
-            console.log("🔗 OAuth signup detected → Onboarding");
+            console.log("🔗 OAuth signup detected → Navigating to Onboarding");
             try {
               localStorage.removeItem("aeorank_onboarding_completed");
               localStorage.removeItem("aeorank_onboarding_state");
             } catch {}
-            navigate("/onboarding");
-            return;
+            navigate("/onboarding", { replace: true });
+            return; // STOP HERE
           }
 
-          // Final fallback: Check user status via API
-          console.log("⚠️ No action/newUser field found, checking user status");
+          // FINAL FALLBACK: Check user status via API (only if no action field found)
+          console.log("⚠️ No valid action field found, checking user status via API");
           const handleUserStatusCheck = async () => {
             if (!possibleToken) {
               console.log("❌ No token available → Onboarding");
@@ -115,7 +125,7 @@ const VerifyEmail = () => {
                 localStorage.removeItem("aeorank_onboarding_completed");
                 localStorage.removeItem("aeorank_onboarding_state");
               } catch {}
-              navigate("/onboarding");
+              navigate("/onboarding", { replace: true });
               return;
             }
 
@@ -142,11 +152,12 @@ const VerifyEmail = () => {
                 localStorage.removeItem("aeorank_onboarding_completed");
                 localStorage.removeItem("aeorank_onboarding_state");
               } catch {}
-              navigate("/onboarding");
+              navigate("/onboarding", { replace: true });
             }
           };
 
-          handleUserStatusCheck();
+          // Use await to ensure this completes
+          await handleUserStatusCheck();
         } else {
           toast({
             title: "Verification Failed",

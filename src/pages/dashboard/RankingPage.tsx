@@ -34,6 +34,7 @@ interface RankingItem {
   id: number;
   brand: string;
   logo: string;
+  domain?: string;
   visibility: string;
   sentiment: number | string;
   position: string;
@@ -112,6 +113,74 @@ const RankingPage = () => {
 
     fetchRankingData();
   }, [timeRange, selectedModel, promptId, dispatch, storePromptId]);
+
+  // Listen for competitor updates and refresh data
+  useEffect(() => {
+    const handleCompetitorUpdate = () => {
+      console.log("🔔 RankingPage: Competitor update event received!");
+      console.log("⏰ Waiting 1 second for backend to process...");
+      // Delay to ensure backend has processed the change
+      setTimeout(() => {
+        console.log("⏰ RankingPage: Delay complete, fetching fresh data from backend...");
+        // Force refetch by invalidating cache
+        dispatch(setLoading(true));
+        dispatch(setError(null));
+        
+        const fetchRankingData = async () => {
+          try {
+            const token = localStorage.getItem('accessToken');
+            const url = promptId 
+              ? `https://aeotest-production.up.railway.app/analyse/brand/prompt/get?prompt_id=${promptId}`
+              : `https://aeotest-production.up.railway.app/analyse/brand/get`;
+            
+            const response = await fetch(url, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (!response.ok) {
+              throw new Error('Failed to fetch ranking data');
+            }
+            
+            const data = await response.json();
+            console.log('RankingPage: Fetched updated ranking data:', data);
+            
+            if (data && Array.isArray(data) && data.length > 0) {
+              const processedData = processRankingData(data, !!promptId);
+              console.log('RankingPage: Processed updated ranking data:', processedData);
+              
+              if (promptId) {
+                dispatch(setPromptRankingData({ promptId, data: processedData }));
+              } else {
+                dispatch(setRankingData(processedData));
+              }
+            } else {
+              if (promptId) {
+                dispatch(setPromptRankingData({ promptId, data: [] }));
+              } else {
+                dispatch(setRankingData([]));
+              }
+            }
+          } catch (err) {
+            console.error('RankingPage: Error fetching ranking data:', err);
+            dispatch(setError('Failed to load ranking data'));
+          } finally {
+            dispatch(setLoading(false));
+          }
+        };
+        
+        fetchRankingData();
+      }, 1000);
+    };
+
+    window.addEventListener("competitor-updated", handleCompetitorUpdate);
+
+    return () => {
+      window.removeEventListener("competitor-updated", handleCompetitorUpdate);
+    };
+  }, [promptId, dispatch]);
 
   if (loading && currentRankingData.length === 0) {
     return <LoadingScreen text="Loading ranking data..." />;
@@ -260,6 +329,7 @@ const RankingPage = () => {
                       <div className="flex items-center gap-2.5">
                         <BrandAvatar
                           brandName={item.brand}
+                          domain={item.domain}
                           logoUrl={item.logo}
                           size="md"
                         />

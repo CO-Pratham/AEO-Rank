@@ -6,25 +6,46 @@ const OAuthCallback: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get("token");
-  const email = params.get("email");
-  const action = params.get("action");
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    const email = params.get("email");
+    const action = params.get("action");
 
-  if (token) {
-    localStorage.setItem("accessToken", token);
-    localStorage.setItem("aeorank_user", email);
-    
-    if (action == "oauth_signup") { 
-      navigate("/onboarding?fresh=1", { replace: true });
+    console.log("🔍 OAuthCallback params:", { token: token ? "present" : "missing", email, action });
+
+    if (token) {
+      localStorage.setItem("accessToken", token);
+      if (email) {
+        localStorage.setItem("aeorank_user", email);
+      }
+      
+      // Normalize action for comparison
+      const normalizedAction = (action || "").toLowerCase().trim();
+      console.log("🎯 OAuth action (normalized):", normalizedAction);
+      
+      // Check for signup actions
+      if (normalizedAction === "oauth_signup" || normalizedAction === "signup") {
+        console.log("✅ OAuth SIGNUP detected → Onboarding");
+        localStorage.removeItem("aeorank_onboarding_completed");
+        localStorage.removeItem("aeorank_onboarding_state");
+        navigate("/onboarding");
+      } 
+      // Check for login actions  
+      else if (normalizedAction === "oauth_login" || normalizedAction === "login") {
+        console.log("✅ OAuth LOGIN detected → Dashboard");
+        localStorage.setItem("aeorank_onboarding_completed", "true");
+        navigate("/dashboard");
+      }
+      // Default fallback (treat as login if no clear signup indicator)
+      else {
+        console.log("⚠️ No clear action, defaulting to Dashboard");
+        navigate("/dashboard");
+      }
     } else {
-      navigate("/dashboard", { replace: true });
+      console.error("❌ OAuth callback failed: No token received");
+      setError("Google login failed. Please try again.");
     }
-  } else {
-    setError("Google login failed. Please try again.");
-    console.log("failed")
-  }
-}, [navigate]);
+  }, [navigate]);
 
 
   const handleGoLogin = () => {

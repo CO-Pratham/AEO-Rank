@@ -13,6 +13,7 @@ interface ProcessedRankingItem {
   id: string | number;
   brand: string;
   logo?: string;
+  domain?: string;
   visibility: string;
   visibilityValue: number;
   sentiment: number | null;
@@ -51,7 +52,8 @@ export const processRankingData = (
           visibility: 0,
           sentiment: 0,
           position: 0,
-          logo: row.logo || ""
+          logo: row.logo || "",
+          domain: row.domain || ""
         };
         
         // Average visibility
@@ -130,6 +132,7 @@ export const processRankingData = (
       id: item.brand,
       brand: displayName,
       logo: getDomainLogo(domain, item.logo, item.brand),
+      domain: domain,
       visibility: `${Math.round(visibility)}%`,
       visibilityValue: visibility,
       sentiment: hasVisibility && Number.isFinite(Number(item.sentiment))

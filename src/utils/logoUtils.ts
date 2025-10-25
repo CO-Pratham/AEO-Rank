@@ -2,6 +2,74 @@
  * Utility functions for fetching and handling domain logos
  */
 
+// LocalStorage key for brand domain cache
+const BRAND_DOMAIN_CACHE_KEY = 'aeorank_brand_domain_cache';
+
+/**
+ * Load brand domain cache from localStorage
+ */
+const loadBrandDomainCache = (): Map<string, string> => {
+  try {
+    const cached = localStorage.getItem(BRAND_DOMAIN_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      return new Map(Object.entries(parsed));
+    }
+  } catch (error) {
+    console.error('Error loading brand domain cache:', error);
+  }
+  return new Map();
+};
+
+/**
+ * Save brand domain cache to localStorage
+ */
+const saveBrandDomainCache = (cache: Map<string, string>): void => {
+  try {
+    const obj = Object.fromEntries(cache);
+    localStorage.setItem(BRAND_DOMAIN_CACHE_KEY, JSON.stringify(obj));
+  } catch (error) {
+    console.error('Error saving brand domain cache:', error);
+  }
+};
+
+// Domain cache to ensure consistent domain usage across the app (now persisted to localStorage)
+const brandDomainCache: Map<string, string> = loadBrandDomainCache();
+
+/**
+ * Normalize a brand name for consistent cache key
+ */
+const normalizeBrandName = (brandName: string): string => {
+  return brandName.toLowerCase().trim().replace(/\s+/g, '');
+};
+
+/**
+ * Set the preferred domain for a brand (to ensure consistency)
+ */
+export const setBrandDomain = (brandName: string, domain: string): void => {
+  if (!brandName || !domain) return;
+  const normalizedName = normalizeBrandName(brandName);
+  const cleanDomain = domain
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .split('/')[0];
+  
+  // Only set if not already cached (first domain wins)
+  if (!brandDomainCache.has(normalizedName)) {
+    brandDomainCache.set(normalizedName, cleanDomain);
+    saveBrandDomainCache(brandDomainCache);
+  }
+};
+
+/**
+ * Get the cached domain for a brand
+ */
+export const getBrandDomain = (brandName: string): string | undefined => {
+  if (!brandName) return undefined;
+  const normalizedName = normalizeBrandName(brandName);
+  return brandDomainCache.get(normalizedName);
+};
+
 /**
  * Get favicon URL for a domain using Google's favicon service
  * @param domain - The domain to get the favicon for (e.g., "example.com" or "https://example.com")
@@ -49,15 +117,28 @@ export const getBrandDomainVariations = (brandName: string): string[] => {
  * @param brandName - Optional brand name to use for logo lookup
  * @returns The best available logo URL
  */
-export const getDomainLogo = (domain: string, logoUrl?: string, brandName?: string): string => {
+export const getDomainLogo = (domain: string | undefined, logoUrl?: string, brandName?: string): string => {
   // If logo URL is provided and starts with http, use it
   if (logoUrl && logoUrl.startsWith('http')) {
     return logoUrl;
   }
   
+  // Check if we have a cached domain for this brand (ensures consistency)
+  let effectiveDomain = domain;
+  if (brandName) {
+    const cachedDomain = getBrandDomain(brandName);
+    if (cachedDomain) {
+      effectiveDomain = cachedDomain;
+    } else if (domain) {
+      // Cache this domain for future use
+      setBrandDomain(brandName, domain);
+      effectiveDomain = domain;
+    }
+  }
+  
   // If domain is provided, get favicon from domain
-  if (domain) {
-    return getFaviconUrl(domain, 64);
+  if (effectiveDomain) {
+    return getFaviconUrl(effectiveDomain, 64);
   }
   
   // If no domain but brand name is provided, try the first domain variation

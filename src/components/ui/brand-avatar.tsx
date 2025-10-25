@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getDomainLogo, generateInitials, getBrandDomainVariations } from "@/utils/logoUtils";
+import { getDomainLogo, generateInitials, getBrandDomainVariations, getBrandDomain, setBrandDomain } from "@/utils/logoUtils";
 import { useState, useEffect } from "react";
+import defaultLogo from "@/assets/images.png";
 
 interface BrandAvatarProps {
   brandName: string;
@@ -25,8 +26,22 @@ export const BrandAvatar = ({
   const [currentLogoIndex, setCurrentLogoIndex] = useState(0);
   const [domainVariations, setDomainVariations] = useState<string[]>([]);
   
-  // Normalize domain
-  let normalizedDomain = domain;
+  // Check if we have a cached domain for this brand (ensures consistency across pages)
+  const cachedDomain = brandName ? getBrandDomain(brandName) : undefined;
+  
+  // Normalize domain - prefer cached domain for consistency
+  let normalizedDomain = cachedDomain || domain;
+  
+  // Cache the domain if provided and not already cached
+  if (brandName && domain && !cachedDomain) {
+    const cleanDomain = domain
+      .replace(/^https?:\/\//i, "")
+      .replace(/^www\./i, "")
+      .replace(/\/.*$/, "");
+    setBrandDomain(brandName, cleanDomain);
+    normalizedDomain = cleanDomain;
+  }
+  
   if (!normalizedDomain && brandName) {
     normalizedDomain = `${brandName.toLowerCase().replace(/\s+/g, "")}.com`;
   }
@@ -87,14 +102,29 @@ export const BrandAvatar = ({
   };
 
   return (
-    <Avatar className={`${sizeClasses[size]} ${className}`}>
+    <Avatar className={`${sizeClasses[size]} ${className} ${highlighted ? 'ring-2 ring-blue-500' : ''}`}>
       {showDomainLogo ? (
         <AvatarImage
           src={currentLogo}
           alt={brandName}
           onError={handleImageError}
         />
-      ) : null}
+      ) : (
+        <AvatarImage
+          src={defaultLogo}
+          alt={brandName}
+          className="p-1 opacity-70"
+        />
+      )}
+      <AvatarFallback 
+        className={`${textSizeClasses[size]} font-semibold ${
+          showFallbackBackground 
+            ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white' 
+            : 'bg-gray-100 text-gray-700'
+        }`}
+      >
+        {generateInitials(brandName)}
+      </AvatarFallback>
     </Avatar>
   );
 };

@@ -45,35 +45,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Download, ArrowRight, Eye, Users, Globe, Globe2, MessageSquare, User, Bot } from "lucide-react";
-
-// Helper function to get country flag emoji
-const getCountryFlag = (location: string): string => {
-  if (!location) return '🌐'; // Default to globe for unknown location
-  
-  const loc = location.toLowerCase();
-  
-  // Map country names to flag emojis
-  if (loc.includes('india') || loc.includes('in')) return '🇮🇳';
-  if (loc.includes('united states') || loc.includes('usa') || loc.includes('us')) return '🇺🇸';
-  if (loc.includes('united kingdom') || loc.includes('uk') || loc.includes('britain') || loc.includes('england')) return '🇬🇧';
-  if (loc.includes('canada') || loc.includes('ca')) return '🇨🇦';
-  if (loc.includes('australia') || loc.includes('au')) return '🇦🇺';
-  if (loc.includes('germany') || loc.includes('de')) return '🇩🇪';
-  if (loc.includes('france') || loc.includes('fr')) return '🇫🇷';
-  if (loc.includes('japan') || loc.includes('jp')) return '🇯🇵';
-  if (loc.includes('china') || loc.includes('cn')) return '🇨🇳';
-  if (loc.includes('brazil') || loc.includes('br')) return '🇧🇷';
-  if (loc.includes('mexico') || loc.includes('mx')) return '🇲🇽';
-  if (loc.includes('spain') || loc.includes('es')) return '🇪🇸';
-  if (loc.includes('italy') || loc.includes('it')) return '🇮🇹';
-  if (loc.includes('russia') || loc.includes('ru')) return '🇷🇺';
-  if (loc.includes('singapore') || loc.includes('sg')) return '🇸🇬';
-  if (loc.includes('netherlands') || loc.includes('nl')) return '🇳🇱';
-  if (loc.includes('sweden') || loc.includes('se')) return '🇸🇪';
-  if (loc.includes('switzerland') || loc.includes('ch')) return '🇨🇭';
-  
-  return '🌐'; // Generic globe for unknown countries
-};
+import { getCountryFlag } from "@/utils/promptUtils";
 
 // Helper function to get AI model logo
 const getModelLogo = (chat: any): string => {
@@ -159,7 +131,7 @@ const formatModelName = (chat: any): string => {
     }
   }
   
-  return 'AI Overview';
+  return 'AI Model';
 };
 
 // Helper function to parse markdown to HTML
@@ -439,6 +411,7 @@ const PromptDetails = () => {
     if (id) fetchVisibility();
   }, [id, timeRange, selectedModel]);
 
+
   // Competitors are now built from the same data as visibility chart
 
   // Fetch prompt-specific domains/sources breakdown
@@ -528,6 +501,15 @@ const PromptDetails = () => {
         // Handle the response - it might be an array or an object with chats property
         const chatsArray = Array.isArray(data) ? data : (data.chats || data.data || []);
         setRecentChats(chatsArray.slice(0, 5));
+        
+        // Extract prompt text from the first chat if available
+        if (chatsArray.length > 0 && !selectedPrompt) {
+          const firstChat = chatsArray[0];
+          const promptText = firstChat.prompt || firstChat.question || firstChat.query || firstChat.user_query || firstChat.title;
+          if (promptText) {
+            setSelectedPrompt(promptText);
+          }
+        }
       } catch (error) {
         console.error("Error fetching chats:", error);
         setRecentChats([]);
@@ -549,46 +531,22 @@ const PromptDetails = () => {
 
   return (
     <div className="space-y-4 pb-8">
-      {/* Selected Prompt Display */}
-      {selectedPrompt && (
-        <Card className="border-border/40 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
-                <MessageSquare className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Selected Prompt</h3>
-                <p className="text-sm text-blue-800 dark:text-blue-200 leading-relaxed mb-3">{selectedPrompt}</p>
-                
-                {/* Location and Volume Info */}
-                <div className="flex items-center gap-4 text-xs">
-                  {promptLocation && (
-                    <div className="flex items-center gap-1.5">
-                      <Globe className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                      <span className="text-blue-700 dark:text-blue-300 font-medium">Location:</span>
-                      <span className="text-blue-600 dark:text-blue-400">{promptLocation}</span>
-                    </div>
-                  )}
-                  {promptVolume > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <Users className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                      <span className="text-blue-700 dark:text-blue-300 font-medium">Volume:</span>
-                      <span className="text-blue-600 dark:text-blue-400">{promptVolume.toLocaleString()}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <Eye className="w-5 h-5 text-muted-foreground" />
-          <h1 className="text-lg font-semibold">Prompt Overview</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold">Prompt Overview</h1>
+            {selectedPrompt && (
+              <>
+                <span className="text-muted-foreground">&gt;</span>
+                <h2 className="text-sm font-medium text-muted-foreground max-w-md truncate">
+                  {selectedPrompt}
+                </h2>
+              </>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <Select value={timeRange} onValueChange={setTimeRange}>
@@ -750,16 +708,31 @@ const PromptDetails = () => {
                       </TableCell>
                       <TableCell className="text-right text-sm font-semibold pr-4 py-3 border-r">{c.visibility}</TableCell>
                       <TableCell className="text-right pr-4 py-3 border-r">
-                        {typeof c.sentiment === "number" ? (
-                          <div className="flex items-center justify-end gap-1">
-                            <div className="w-0.5 h-3.5 bg-green-500 rounded"></div>
-                            <span className="text-sm font-medium text-green-600">{c.sentiment}</span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">—</span>
-                        )}
+                        {(() => {
+                          const visibility = Number(c.visibility.replace('%', ''));
+                          if (visibility === 0) {
+                            return <span className="text-sm text-muted-foreground">—</span>;
+                          }
+                          return typeof c.sentiment === "number" ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <div className="w-0.5 h-3.5 bg-green-500 rounded"></div>
+                              <span className="text-sm font-medium text-green-600">{c.sentiment}</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">—</span>
+                          );
+                        })()}
                       </TableCell>
-                      <TableCell className="text-right text-sm font-medium pr-6 py-3">{c.position}</TableCell>
+                      <TableCell className="text-right text-sm font-medium pr-6 py-3">
+                        {(() => {
+                          const visibility = Number(c.visibility.replace('%', ''));
+                          return visibility === 0 ? (
+                            <span className="text-sm text-muted-foreground">—</span>
+                          ) : (
+                            c.position
+                          );
+                        })()}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -936,25 +909,39 @@ const PromptDetails = () => {
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    {/* Title/Prompt */}
-                    <h3 className="text-sm font-medium text-foreground mb-3 line-clamp-2">
-                      {chat.prompt || chat.question || chat.query || chat.user_query || chat.title || "Chat message"}
-                    </h3>
+                    {/* AI Response preview instead of prompt */}
+                    <p className="text-sm text-foreground mb-3 line-clamp-2 leading-relaxed">
+                      {(chat.response || chat.answer || chat.ai_response || "No response available")
+                        .replace(/[*#_`\[\]]/g, '') // Remove markdown symbols
+                        .substring(0, 150)}
+                      {(chat.response || chat.answer || chat.ai_response || "").length > 150 && '...'}
+                    </p>
 
                     {/* Meta Info */}
                     <div className="flex items-center gap-3 flex-wrap">
                       {/* AI Model Badge */}
                       <div className="flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-md">
-                        <MessageSquare className="w-3 h-3 text-muted-foreground" />
+                        {getModelLogo(chat) ? (
+                          <img 
+                            src={getModelLogo(chat)} 
+                            alt="AI" 
+                            className="w-4 h-4 rounded-full"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <MessageSquare className="w-3 h-3 text-muted-foreground" />
+                        )}
                         <span className="text-xs text-muted-foreground">
-                          {chat.model || chat.platform || chat.ai_model || "AI Overview"}
+                          {formatModelName(chat)}
                         </span>
                       </div>
 
                       {/* Location Badge if available */}
                       {(chat.location || chat.country) && (
                         <div className="flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-md">
-                          <Globe2 className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-sm">{getCountryFlag(chat.location || chat.country)}</span>
                           <span className="text-xs text-muted-foreground">
                             {chat.location || chat.country}
                           </span>
@@ -1108,65 +1095,109 @@ const PromptDetails = () => {
                     {/* Brands Section */}
                     <div>
                       <h3 className="text-sm font-semibold text-foreground mb-3">Brands</h3>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                        </svg>
-                        <span>No brands mentioned</span>
-                      </div>
+                      {(() => {
+                        const mentions = selectedChat.mentions || selectedChat.brands || selectedChat.brand_mentions;
+                        
+                        if (!mentions || (typeof mentions === 'object' && Object.keys(mentions).length === 0)) {
+                          return (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                              </svg>
+                              <span>No brands mentioned</span>
+                            </div>
+                          );
+                        }
+
+                        const brandEntries = Object.entries(mentions).filter(([_, count]) => Number(count) > 0);
+                        
+                        if (brandEntries.length === 0) {
+                          return (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                              </svg>
+                              <span>No brands mentioned</span>
+                            </div>
+                          );
+                        }
+
+                        return brandEntries.map(([brandName, count]: [string, any], index: number) => {
+                          const domain = `${brandName.toLowerCase().replace(/\s+/g, '').replace(/\./g, '')}.com`;
+                          return (
+                            <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted/30 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <img 
+                                  src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} 
+                                  alt="" 
+                                  className="w-4 h-4 rounded" 
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+                                />
+                                <span className="text-xs font-medium text-foreground">{brandName}</span>
+                              </div>
+                              <span className="text-xs text-muted-foreground font-semibold">×{count}</span>
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
 
                     {/* Sources Section */}
                     <div>
                       <h3 className="text-sm font-semibold text-foreground mb-3">Sources</h3>
                       <div className="space-y-3">
-                        {/* Extract and display sources from response */}
                         {(() => {
-                          const response = selectedChat.response || selectedChat.answer || selectedChat.ai_response || "";
-                          const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g;
-                          const rawUrls: string[] = response.match(urlRegex) || [];
+                          const sources = selectedChat.sources || selectedChat.citations || selectedChat.source_urls || [];
+                          const sourceArray = Array.isArray(sources) ? sources : [];
                           
-                          // Clean URLs - remove trailing punctuation
-                          const cleanedUrls = rawUrls.map(url => {
-                            // Remove trailing punctuation like ), ., ,, ;, etc.
-                            return url.replace(/[.,;:)\]]+$/, '');
-                          });
-                          
-                          const uniqueUrls: string[] = [...new Set(cleanedUrls)];
-
-                          if (uniqueUrls.length === 0) {
+                          if (sourceArray.length === 0) {
                             return (
                               <p className="text-sm text-muted-foreground">No sources found</p>
                             );
                           }
 
-                          return uniqueUrls.map((url: string, index: number) => {
+                          return sourceArray.map((sourceItem: any, index: number) => {
                             try {
-                              const urlObj = new URL(url);
-                              const domain = urlObj.hostname.replace('www.', '');
-                              const title = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
+                              let domain = '';
+                              let url = '';
+                              
+                              if (typeof sourceItem === 'string') {
+                                if (sourceItem.startsWith('http://') || sourceItem.startsWith('https://')) {
+                                  url = sourceItem;
+                                  const urlObj = new URL(sourceItem);
+                                  domain = urlObj.hostname.replace('www.', '');
+                                } else {
+                                  domain = sourceItem.replace('www.', '');
+                                  url = `https://${domain}`;
+                                }
+                              } else if (sourceItem && typeof sourceItem === 'object') {
+                                domain = sourceItem.domain || sourceItem.url || '';
+                                url = sourceItem.url || `https://${domain}`;
+                              }
+                              
+                              if (!domain) return null;
+                              
+                              const displayTitle = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
                               
                               return (
-                                <a
-                                  key={index}
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                <a 
+                                  key={index} 
+                                  href={url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
                                   className="flex items-start gap-3 p-3 hover:bg-muted/30 rounded-lg border border-transparent hover:border-border transition-colors group"
                                 >
                                   <div className="w-5 h-5 bg-muted rounded flex items-center justify-center flex-shrink-0 mt-0.5">
                                     <img 
-                                      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
-                                      alt=""
-                                      className="w-3.5 h-3.5"
-                                      onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                      }}
+                                      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} 
+                                      alt="" 
+                                      className="w-3.5 h-3.5" 
+                                      onError={(e) => { e.currentTarget.style.display = 'none'; }} 
                                     />
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <h4 className="text-xs font-medium text-foreground mb-0.5 truncate group-hover:text-blue-600">
-                                      {title}
+                                      {displayTitle}
                                     </h4>
                                     <p className="text-xs text-muted-foreground truncate">
                                       {domain}
