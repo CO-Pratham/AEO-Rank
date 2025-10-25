@@ -6,12 +6,123 @@
   NODE_VERSION = "18"
   NPM_FLAGS = "--production=false"
 
-# SPA routing - only redirect specific routes, let Netlify handle static files naturally
+# SPA routing - redirect specific dashboard routes but NOT assets
 [[redirects]]
-  from = "/dashboard/*"
+  from = "/dashboard/prompts/*"
   to = "/index.html"
   status = 200
 
+[[redirects]]
+  from = "/dashboard/sources"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/sources/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/competitors"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/competitors/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/tags"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/tags/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/people"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/people/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/workspace"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/workspace/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/company"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/company/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/billing"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/billing/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/subscription"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/subscription/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/settings"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/settings/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/best-practices"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/best-practices/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/recommendations"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/dashboard/recommendations/*"
+  to = "/index.html"
+  status = 200
+
+# Other page routes
 [[redirects]]
   from = "/login"
   to = "/index.html"
