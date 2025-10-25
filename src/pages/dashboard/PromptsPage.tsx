@@ -746,7 +746,7 @@ const PromptsPage = () => {
                 <Card className="border-border/40">
                   <CardContent className="p-0">
                     <div className="relative">
-                      <div className="overflow-x-hidden">
+                      <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow className="hover:bg-transparent">
@@ -908,12 +908,9 @@ const PromptsPage = () => {
                                   </TableCell>
                                   <TableCell className="text-center py-3">
                                     <span className="text-sm font-semibold">
-                                      {(() => {
-                                        const value = Number(prompt.visibility);
-                                        return !isNaN(value) && prompt.visibility !== undefined && prompt.visibility !== null
-                                          ? `${Math.round(value)}%`
-                                          : "—";
-                                      })()}
+                                      {prompt.visibility && prompt.visibility !== "—" 
+                                        ? prompt.visibility
+                                        : "—"}
                                     </span>
                                   </TableCell>
                                   <TableCell className="text-center py-3">
@@ -935,12 +932,9 @@ const PromptsPage = () => {
                                   </TableCell>
                                   <TableCell className="text-center py-3">
                                     <span className="text-sm font-medium">
-                                      {(() => {
-                                        const value = Number(prompt.position);
-                                        return !isNaN(value) && prompt.position !== undefined && prompt.position !== null
-                                          ? `#${value}`
-                                          : "—";
-                                      })()}
+                                      {prompt.position && prompt.position !== "—" 
+                                        ? prompt.position
+                                        : "—"}
                                     </span>
                                   </TableCell>
                                   <TableCell className="text-center py-3">
@@ -1226,7 +1220,7 @@ const PromptsPage = () => {
                 <Card className="border-border/40">
                   <CardContent className="p-0">
                     <div className="relative">
-                      <div className="overflow-x-hidden">
+                      <div className="overflow-x-auto">
                         <Table>
                         <TableHeader>
                           <TableRow className="hover:bg-transparent">
@@ -1316,12 +1310,9 @@ const PromptsPage = () => {
                               </TableCell>
                               <TableCell className="text-center py-3">
                                 <span className="text-sm font-semibold">
-                                  {(() => {
-                                    const value = Number(prompt.visibility);
-                                    return !isNaN(value) && prompt.visibility !== undefined && prompt.visibility !== null
-                                      ? `${Math.round(value)}%`
-                                      : "—";
-                                  })()}
+                                  {prompt.visibility && prompt.visibility !== "—" 
+                                    ? prompt.visibility
+                                    : "—"}
                                 </span>
                               </TableCell>
                               <TableCell className="text-center py-3">
@@ -1343,12 +1334,9 @@ const PromptsPage = () => {
                               </TableCell>
                               <TableCell className="text-center py-3">
                                 <span className="text-sm font-medium">
-                                  {(() => {
-                                    const value = Number(prompt.position);
-                                    return !isNaN(value) && prompt.position !== undefined && prompt.position !== null
-                                      ? `#${value}`
-                                      : "—";
-                                  })()}
+                                  {prompt.position && prompt.position !== "—" 
+                                    ? prompt.position
+                                    : "—"}
                                 </span>
                               </TableCell>
                               <TableCell className="text-center py-3">

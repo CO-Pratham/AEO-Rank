@@ -251,6 +251,7 @@ const PromptDetails = () => {
   const [selectedPrompt, setSelectedPrompt] = useState<string>("");
   const [promptLocation, setPromptLocation] = useState<string>("");
   const [promptVolume, setPromptVolume] = useState<number>(0);
+  const [hoveredBrand, setHoveredBrand] = useState<string | null>(null);
 
   // Fetch visibility series derived from competitor data for this prompt
   useEffect(() => {
@@ -277,42 +278,106 @@ const PromptDetails = () => {
             }
           }
 
+          // Generate proper date range based on timeRange selection (similar to dashboard)
+          const getDaysCount = () => {
+            switch (timeRange) {
+              case "7d": return 7;
+              case "14d": return 14;
+              case "30d": return 30;
+              default: return 7;
+            }
+          };
+          
+          // Find the earliest date from actual data
+          let earliestDate: Date | null = null;
+          if (Array.isArray(data) && data.length > 0) {
+            data.forEach((item: any) => {
+              const itemDate = item.date || item.timestamp || item.created_at;
+              if (itemDate) {
+                const date = new Date(itemDate);
+                if (!earliestDate || date < earliestDate) {
+                  earliestDate = date;
+                }
+              }
+            });
+          }
+          
+          const today = new Date();
+          const requestedDaysCount = getDaysCount();
+          
+          // Calculate actual days since account creation/first data
+          let actualDaysCount = requestedDaysCount;
+          if (earliestDate) {
+            const daysSinceCreation = Math.ceil((today.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            // Use minimum of requested days and actual days since creation (with minimum of 2 days)
+            actualDaysCount = Math.max(2, Math.min(requestedDaysCount, daysSinceCreation));
+          }
+          
+          const uniqueDates: string[] = [];
+          
+          // Generate dates from earliest to today (only for actual days)
+          for (let i = actualDaysCount - 1; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(today.getDate() - i);
+            uniqueDates.push(date.toISOString().split("T")[0]);
+          }
+          
+          console.log(`📅 Generated date range for ${timeRange}:`, uniqueDates);
+          console.log(`📅 Account created: ${earliestDate?.toISOString().split("T")[0] || "Unknown"}`);
+          console.log(`📅 Actual days count: ${actualDaysCount}`);
+
           // Expect rows with date and brand visibility; build series per brand
-          const uniqueDates = Array.from(
-            new Set(data.map((d: any) => d.date || d.timestamp || new Date().toISOString().split("T")[0]))
-          ).sort();
+          // const uniqueDates = Array.from(
+          //   new Set(data.map((d: any) => d.date || d.timestamp || new Date().toISOString().split("T")[0]))
+          // ).sort();
           
           // Get all unique brands first to ensure we include all brands in the chart
           const allBrands = Array.from(new Set(data.map((row: any) => row.brand || row.brand_name || row.name).filter(Boolean)));
           
-          const chartData = uniqueDates.map((date) => {
+          // Create proper graph progression for new accounts
+          const chartData = uniqueDates.map((date, index) => {
             const day: Record<string, string | number> = { date };
             
-            // Initialize all brands with 0 for this date
+            // For each brand, create a progression from 0 to current visibility
             allBrands.forEach(brand => {
-              day[brand] = 0;
-            });
-            
-            // Then populate with actual data
-            data.forEach((row: any) => {
-              const rowDate = row.date || row.timestamp || date;
-              if (rowDate === date) {
+              // Find the current visibility for this brand
+              const brandData = data.find((row: any) => {
                 const seriesKey = row.brand || row.brand_name || row.name;
-                if (seriesKey) {
-                  const value = Number(row.visibility ?? row.avg_visibility ?? 0);
-                  // Include all brands, even with 0 visibility
-                  day[seriesKey] = Math.round(Math.min(100, Math.max(0, value)));
-                }
+                return seriesKey === brand;
+              });
+              
+              const currentVisibility = brandData ? Number(brandData.visibility ?? brandData.avg_visibility ?? 0) : 0;
+              
+              // Show sharp jump: 0% on previous days, current visibility on today
+              if (index === actualDaysCount - 1) {
+                // Last day (today) - show current visibility
+                day[brand] = Math.round(Math.min(100, Math.max(0, currentVisibility)));
+              } else {
+                // All previous days - always 0%
+                day[brand] = 0;
               }
             });
+            
             return day;
           });
           setVisibilityData(chartData);
           
           // Debug logging
-          console.log("Processed visibility data:", chartData);
-          console.log("All brands found:", allBrands);
-          console.log("Sample API row:", data[0]);
+          console.log("📊 Processed visibility data:", chartData);
+          console.log("🏢 All brands found:", allBrands);
+          console.log("📅 Date range:", uniqueDates);
+          console.log("📈 Actual days count:", actualDaysCount);
+          console.log("🔍 Sample API row:", data[0]);
+          
+          // Log visibility pattern for each brand
+          allBrands.forEach(brand => {
+            const brandData = data.find((row: any) => {
+              const seriesKey = row.brand || row.brand_name || row.name;
+              return seriesKey === brand;
+            });
+            const currentVisibility = brandData ? Number(brandData.visibility ?? brandData.avg_visibility ?? 0) : 0;
+            console.log(`📊 ${brand}: Previous days = 0%, Today = ${currentVisibility}%`);
+          });
 
           // Build competitors from the same data - include all brands
           const brandMap = new Map();
@@ -619,9 +684,13 @@ const PromptDetails = () => {
                 <ReTooltip contentStyle={{ fontSize: 12 }} formatter={(v: any) => `${v}%`} />
                 {Object.keys(visibilityData[0] || {})
                   .filter((k) => k !== "date")
-                  .map((seriesKey, index) => {
+                  .filter((seriesKey) => !hoveredBrand || seriesKey === hoveredBrand)
+                  .map((seriesKey) => {
                     const colors = ["#3b82f6", "#ef4444", "#f97316", "#8b5cf6", "#10b981"];
-                    const color = colors[index % colors.length];
+                    // Get the original index of this brand to maintain consistent colors
+                    const allBrands = Object.keys(visibilityData[0] || {}).filter((k) => k !== "date");
+                    const originalIndex = allBrands.indexOf(seriesKey);
+                    const color = colors[originalIndex % colors.length];
                     return (
                       <Line 
                         key={seriesKey} 
@@ -629,10 +698,11 @@ const PromptDetails = () => {
                         dataKey={seriesKey} 
                         stroke={color} 
                         strokeWidth={2} 
-                        dot={{ r: 4, fill: color, strokeWidth: 2, stroke: color }} 
+                        dot={false}
                         activeDot={{ r: 6, fill: color, strokeWidth: 2, stroke: "#fff" }} 
                         connectNulls={false}
                         hide={false}
+                        isAnimationActive={false}
                       />
                     );
                   })}
@@ -694,9 +764,32 @@ const PromptDetails = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {competitors.slice(0, 5).map((c, index) => (
-                    <TableRow key={c.id || index} className="hover:bg-muted/50 border-b last:border-0">
-                      <TableCell className="text-xs text-muted-foreground pl-6 py-3 border-r">{index + 1}</TableCell>
+                  {competitors.slice(0, 5).map((c, index) => {
+                    const isHovered = hoveredBrand === c.brand;
+                    const colors = ["#3b82f6", "#ef4444", "#f97316", "#8b5cf6", "#10b981"];
+                    // Get the original index of this brand to maintain consistent colors with graph
+                    const allBrands = Object.keys(visibilityData[0] || {}).filter((k) => k !== "date");
+                    const originalIndex = allBrands.indexOf(c.brand);
+                    const color = colors[originalIndex % colors.length];
+                    return (
+                      <TableRow 
+                        key={c.id || index} 
+                        className="hover:bg-muted/50 border-b last:border-0 transition-colors"
+                        onMouseEnter={() => setHoveredBrand(c.brand)}
+                        onMouseLeave={() => setHoveredBrand(null)}
+                      >
+                        <TableCell className="text-xs text-muted-foreground pl-6 py-3 border-r">
+                          <div className="flex items-center justify-start min-w-[24px]">
+                            {isHovered ? (
+                              <div
+                                className="w-3 h-3 rounded-full ring-2 ring-white dark:ring-gray-900"
+                                style={{ backgroundColor: color }}
+                              />
+                            ) : (
+                              <span>{index + 1}</span>
+                            )}
+                          </div>
+                        </TableCell>
                       <TableCell className="py-3 border-r">
                         <div className="flex items-center gap-2.5">
                           <Avatar className="w-6 h-6">
@@ -734,7 +827,8 @@ const PromptDetails = () => {
                         })()}
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

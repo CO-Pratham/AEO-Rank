@@ -123,14 +123,14 @@ const DashboardSidebar = ({ collapsed, onToggle }: DashboardSidebarProps) => {
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between">
           {!collapsed && (
-            <Link to="/" className="flex items-center space-x-2">
+            <Link to="/dashboard" className="flex items-center space-x-2">
               <img src="/AEO-Rank.jpeg" alt="AEORank" className="w-8 h-8 rounded-sm object-cover" />
               <span className="text-lg font-bold text-foreground">AEORank</span>
             </Link>
           )}
           {collapsed && (
             <Link
-              to="/"
+              to="/dashboard"
               className="flex items-center justify-center mx-auto"
             >
               <img src="/AEO-Rank.jpeg" alt="AEORank" className="w-8 h-8 rounded-sm object-cover" />

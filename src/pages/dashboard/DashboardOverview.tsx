@@ -911,6 +911,7 @@ const DashboardOverview = () => {
                               stroke: "#fff",
                             }}
                             connectNulls={false}
+                            isAnimationActive={false}
                           />
                         );
                       })
@@ -1176,25 +1177,27 @@ const DashboardOverview = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="pb-4">
-              <div className="relative mb-5 flex justify-center">
-                <div className="relative w-[180px] h-[180px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={sourcesTypeData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={75}
-                        outerRadius={85}
-                        paddingAngle={2}
-                        dataKey="value"
-                        onMouseEnter={(data) => setHoveredPieData(data)}
-                        onMouseLeave={() => setHoveredPieData(null)}
-                      >
-                        {sourcesTypeData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
+              {sourcesTypeData.length > 0 ? (
+                <>
+                  <div className="relative mb-5 flex justify-center">
+                  <div className="relative w-[180px] h-[180px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={sourcesTypeData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={75}
+                          outerRadius={85}
+                          paddingAngle={2}
+                          dataKey="value"
+                          onMouseEnter={(data) => setHoveredPieData(data)}
+                          onMouseLeave={() => setHoveredPieData(null)}
+                        >
+                          {sourcesTypeData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
                       <Tooltip
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
@@ -1265,18 +1268,32 @@ const DashboardOverview = () => {
                     )}
                   </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
-                {sourcesTypeData.map((item) => (
-                  <div key={item.name} className="flex items-center gap-1.5">
-                    <div
-                      className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="text-[10px] font-medium">{item.name}</span>
                   </div>
-                ))}
-              </div>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+                    {sourcesTypeData.map((item) => (
+                      <div key={item.name} className="flex items-center gap-1.5">
+                        <div
+                          className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span className="text-[10px] font-medium">{item.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="text-4xl font-bold text-muted-foreground mb-2">
+                    0
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    No Sources Data
+                  </div>
+                  <div className="text-[8px] text-muted-foreground mt-1">
+                    Add sources to see distribution
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -1405,14 +1422,19 @@ const DashboardOverview = () => {
                 }}
               >
                 <CardContent className="p-3.5">
-                  {/* Success Indicator & Prompt */}
+                  {/* Country Flag & Prompt */}
                   <div className="flex items-start gap-2 mb-2">
-                    <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-green-500 flex items-center justify-center">
-                        <svg className="w-1.5 h-1.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
+                    <div className="w-4 h-4 rounded-full bg-muted/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      {(() => {
+                        const location = chat.location || chat.country || chat.region;
+                        if (location) {
+                          const countryFlag = getCountryFlag(location);
+                          if (countryFlag) {
+                            return <span className="text-sm">{countryFlag}</span>;
+                          }
+                        }
+                        return <Globe className="w-3 h-3 text-muted-foreground" />;
+                      })()}
                     </div>
                     <div className="flex-1 min-w-0">
                       {/* Backend sends prompt field */}
@@ -1465,27 +1487,24 @@ const DashboardOverview = () => {
                           
                           return (
                             <div className="flex items-center gap-1 ml-2">
-                              {brandEntries.slice(0, 2).map(([brandName, count]: [string, any], index: number) => {
+                              {brandEntries.slice(0, 3).map(([brandName, count]: [string, any], index: number) => {
                                 const domain = `${brandName.toLowerCase().replace(/\s+/g, '').replace(/\./g, '')}.com`;
                                 return (
-                                  <div key={index} className="flex items-center gap-1">
-                                    <img 
-                                      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} 
-                                      alt={brandName}
-                                      className="w-3 h-3 rounded"
-                                      onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                      }}
-                                    />
-                                    <span className="text-xs text-muted-foreground font-medium">
-                                      {brandName}
-                                    </span>
-                                  </div>
+                                  <img 
+                                    key={index}
+                                    src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} 
+                                    alt={brandName}
+                                    className="w-3 h-3 rounded"
+                                    title={brandName}
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
                                 );
                               })}
-                              {brandEntries.length > 2 && (
+                              {brandEntries.length > 3 && (
                                 <span className="text-xs text-muted-foreground">
-                                  +{brandEntries.length - 2}
+                                  +{brandEntries.length - 3}
                                 </span>
                               )}
                             </div>

@@ -336,6 +336,7 @@ const SourcesPage = () => {
                           strokeWidth={1.5}
                           dot={{ fill: color, r: 3 }}
                           activeDot={{ r: 5 }}
+                          isAnimationActive={false}
                         />
                       );
                     }) : null}
@@ -352,135 +353,152 @@ const SourcesPage = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center pt-2 pb-4">
-                <div className="h-[180px] relative w-full flex justify-center">
-                  <ChartContainer config={pieChartConfig} className="w-full">
-                    <PieChart>
-                      <Pie
-                        data={sourceTypeData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={75}
-                        innerRadius={65}
-                        fill="#8884d8"
-                        dataKey="value"
-                        paddingAngle={1.5}
-                        onMouseEnter={(data) => setHoveredData(data)}
-                        onMouseLeave={() => setHoveredData(null)}
-                      >
-                        {sourceTypeData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
-                      </Pie>
-                      <ChartTooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0];
-                            const percentage = ((Number(data.value) / totalSources) * 100).toFixed(1);
-                            return (
-                              <div className="bg-white border border-gray-300 rounded-lg shadow-xl p-3">
-                                <div className="flex items-center gap-2 mb-1.5">
-                                  <div
-                                    className="w-3 h-3 rounded-sm"
-                                    style={{ backgroundColor: data.payload.fill }}
-                                  />
-                                  <p className="font-semibold text-sm text-foreground">{data.name}</p>
-                                </div>
-                                <p className="text-xs text-muted-foreground mb-0.5">
-                                  Value: <span className="font-semibold text-foreground">{data.value}</span>
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  Percentage: <span className="font-semibold text-foreground">{percentage}%</span>
-                                </p>
+                {sourceTypeData.length > 0 ? (
+                  <>
+                    <div className="h-[180px] relative w-full flex justify-center">
+                      <ChartContainer config={pieChartConfig} className="w-full">
+                        <PieChart>
+                          <Pie
+                            data={sourceTypeData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={75}
+                            innerRadius={65}
+                            fill="#8884d8"
+                            dataKey="value"
+                            paddingAngle={1.5}
+                            onMouseEnter={(data) => setHoveredData(data)}
+                            onMouseLeave={() => setHoveredData(null)}
+                          >
+                            {sourceTypeData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.fill} />
+                            ))}
+                          </Pie>
+                          <ChartTooltip
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                const data = payload[0];
+                                const percentage = ((Number(data.value) / totalSources) * 100).toFixed(1);
+                                return (
+                                  <div className="bg-white border border-gray-300 rounded-lg shadow-xl p-3">
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                      <div
+                                        className="w-3 h-3 rounded-sm"
+                                        style={{ backgroundColor: data.payload.fill }}
+                                      />
+                                      <p className="font-semibold text-sm text-foreground">{data.name}</p>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mb-0.5">
+                                      Value: <span className="font-semibold text-foreground">{data.value}</span>
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Percentage: <span className="font-semibold text-foreground">{percentage}%</span>
+                                    </p>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                            wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
+                            cursor={false}
+                            offset={15}
+                          />
+                        </PieChart>
+                      </ChartContainer>
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="text-center">
+                          {hoveredData ? (
+                            <>
+                              <div className="text-3xl font-bold">
+                                {((hoveredData.value / totalSources) * 100).toFixed(1)}%
                               </div>
-                            );
-                          }
-                          return null;
-                        }}
-                        wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
-                        cursor={false}
-                        offset={15}
-                      />
-                    </PieChart>
-                  </ChartContainer>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="text-center">
-                      {hoveredData ? (
-                        <>
-                          <div className="text-3xl font-bold">
-                            {((hoveredData.value / totalSources) * 100).toFixed(1)}%
-                          </div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {hoveredData.name}
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="text-3xl font-bold">{totalSources}</div>
-                          <div className="text-[10px] text-muted-foreground">
-                            Sources
-                          </div>
-                        </>
-                      )}
+                              <div className="text-[10px] text-muted-foreground">
+                                {hoveredData.name}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="text-3xl font-bold">{totalSources}</div>
+                              <div className="text-[10px] text-muted-foreground">
+                                Sources
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Color Legend */}
+                    <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 w-full">
+                      {sourceTypeData.map((item) => (
+                        <div key={item.name} className="flex items-center gap-1">
+                          <div
+                            className="w-2.5 h-2.5 rounded-sm"
+                            style={{ backgroundColor: item.fill }}
+                          />
+                          <span className="text-[10px] font-medium">
+                            {item.name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="text-3xl font-bold text-muted-foreground mb-2">
+                      0
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      No Sources Data
+                    </div>
+                    <div className="text-[8px] text-muted-foreground mt-1">
+                      Add sources to see distribution
                     </div>
                   </div>
-                </div>
-
-                {/* Color Legend */}
-                <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 w-full">
-                  {sourceTypeData.map((item) => (
-                    <div key={item.name} className="flex items-center gap-1">
-                      <div
-                        className="w-2.5 h-2.5 rounded-sm"
-                        style={{ backgroundColor: item.fill }}
-                      />
-                      <span className="text-[10px] font-medium">
-                        {item.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Sources Table */}
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-sm font-semibold">Domain</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const headers = ["Domain", "Used", "Citations", "Type"];
-                    const csvContent = [
-                      headers.join(","),
-                      ...topSourcesData.map((source) =>
-                        [
-                          source.domain,
-                          source.used,
-                          source.avgCitations,
-                          source.type,
-                        ].join(",")
-                      ),
-                    ].join("\n");
+          {/* Sources Table - Only show when data is available */}
+          {topSourcesData.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-sm font-semibold">Domain</CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const headers = ["Domain", "Used", "Citations", "Type"];
+                      const csvContent = [
+                        headers.join(","),
+                        ...topSourcesData.map((source) =>
+                          [
+                            source.domain,
+                            source.used,
+                            source.avgCitations,
+                            source.type,
+                          ].join(",")
+                        ),
+                      ].join("\n");
 
-                    const blob = new Blob([csvContent], { type: "text/csv" });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = "sources-domains.csv";
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                  }}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="px-0 pb-0">
+                      const blob = new Blob([csvContent], { type: "text/csv" });
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "sources-domains.csv";
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Export
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="px-0 pb-0">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b">
@@ -563,6 +581,7 @@ const SourcesPage = () => {
               </Table>
             </CardContent>
           </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="urls" className="space-y-6">
@@ -624,6 +643,7 @@ const SourcesPage = () => {
                     strokeWidth={1.5}
                     dot={{ fill: "#ffc658", r: 3 }}
                     activeDot={{ r: 5 }}
+                    isAnimationActive={false}
                   />
                   <Line
                     type="monotone"
@@ -632,6 +652,7 @@ const SourcesPage = () => {
                     strokeWidth={1.5}
                     dot={{ fill: "#8884d8", r: 3 }}
                     activeDot={{ r: 5 }}
+                    isAnimationActive={false}
                   />
                   <Line
                     type="monotone"
@@ -640,6 +661,7 @@ const SourcesPage = () => {
                     strokeWidth={1.5}
                     dot={{ fill: "#00d4ff", r: 3 }}
                     activeDot={{ r: 5 }}
+                    isAnimationActive={false}
                   />
                   <Line
                     type="monotone"
@@ -648,6 +670,7 @@ const SourcesPage = () => {
                     strokeWidth={1.5}
                     dot={{ fill: "#82ca9d", r: 3 }}
                     activeDot={{ r: 5 }}
+                    isAnimationActive={false}
                   />
                   <Line
                     type="monotone"
@@ -656,6 +679,7 @@ const SourcesPage = () => {
                     strokeWidth={1.5}
                     dot={{ fill: "#ff7300", r: 3 }}
                     activeDot={{ r: 5 }}
+                    isAnimationActive={false}
                   />
                 </LineChart>
               </ChartContainer>

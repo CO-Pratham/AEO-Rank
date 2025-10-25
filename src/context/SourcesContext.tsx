@@ -117,23 +117,15 @@ export const SourcesProvider: React.FC<SourcesProviderProps> = ({ children }) =>
         setTopSourcesData(topSourcesData);
         console.log('✅ Sources data processed and set');
       } else {
-        console.log('⚠️ No sources data in response, using fallback');
-        setSourcesTypeData([
-          { name: 'Corporate', value: 45, color: '#8b87ff' },
-          { name: 'UGC', value: 30, color: '#82ca9d' },
-          { name: 'Editorial', value: 25, color: '#ffc658' }
-        ]);
+        console.log('⚠️ No sources data in response, showing empty charts');
+        setSourcesTypeData([]);
         setTopSourcesData([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       console.error('❌ Error fetching sources:', err);
-      // Set fallback data on error
-      setSourcesTypeData([
-        { name: 'Corporate', value: 45, color: '#8b87ff' },
-        { name: 'UGC', value: 30, color: '#82ca9d' },
-        { name: 'Editorial', value: 25, color: '#ffc658' }
-      ]);
+      // Show empty charts on error instead of mock data
+      setSourcesTypeData([]);
       setTopSourcesData([]);
     } finally {
       console.log('⏹️ Sources loading stopped');
