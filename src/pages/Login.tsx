@@ -39,7 +39,7 @@ const Login = () => {
           },
           body: JSON.stringify({
             email,
-            baseurl: "https://aeorank.netlify.app",
+            baseurl: "https://aeo-frontend-main-branch-main.vercel.app",
           }),
         }
       );
