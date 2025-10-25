@@ -45,9 +45,13 @@ export const SourcesProvider: React.FC<SourcesProviderProps> = ({ children }) =>
   const [topSourcesData, setTopSourcesData] = useState<TopSourceData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState<boolean>(false);
 
   const fetchSources = async () => {
-    setLoading(true);
+    // Only set loading to true if we haven't loaded data yet
+    if (!hasLoadedOnce) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const token = localStorage.getItem('accessToken');
@@ -138,6 +142,7 @@ export const SourcesProvider: React.FC<SourcesProviderProps> = ({ children }) =>
     } finally {
       console.log('⏹️ Sources loading stopped');
       setLoading(false);
+      setHasLoadedOnce(true);
     }
   };
 

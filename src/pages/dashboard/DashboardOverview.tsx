@@ -344,8 +344,20 @@ const DashboardOverview = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [hoveredBrand, setHoveredBrand] = useState<string | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [hasShownDashboard, setHasShownDashboard] = useState(false);
 
-  // Refetch data when component mounts or when there are errors
+  // Only show loading screen once, then never again
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      console.log('⏰ DashboardOverview: Loading timeout reached, showing dashboard');
+      setIsInitialLoad(false);
+      setHasShownDashboard(true);
+    }, 5000); // Reduced to 5 seconds
+
+    return () => clearTimeout(timeout);
+  }, []);
+
+  // Refetch data when component mounts
   useEffect(() => {
     const refetchData = async () => {
       try {
@@ -357,24 +369,11 @@ const DashboardOverview = () => {
         console.log('✅ DashboardOverview: All data refetched successfully');
       } catch (error) {
         console.error('❌ DashboardOverview: Error refetching data:', error);
-      } finally {
-        setIsInitialLoad(false);
       }
     };
 
-    // Set a timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      console.log('⏰ DashboardOverview: Loading timeout reached, showing dashboard');
-      setIsInitialLoad(false);
-    }, 10000); // 10 second timeout
-
-    // Only refetch if we're not already loading
-    if (!brandLoading && !sourcesLoading) {
-      refetchData();
-    }
-
-    return () => clearTimeout(timeout);
-  }, [brandLoading, sourcesLoading]);
+    refetchData();
+  }, []);
 
   const fetchVisibilityData = async () => {
     try {
@@ -753,8 +752,8 @@ const DashboardOverview = () => {
     }
   };
 
-  // Show loading screen only during initial load with timeout
-  if (isInitialLoad && (brandLoading || sourcesLoading)) {
+  // Show loading screen only once during initial load, then never again
+  if (isInitialLoad && !hasShownDashboard) {
     return <LoadingScreen text="Loading dashboard data..." />;
   }
 
