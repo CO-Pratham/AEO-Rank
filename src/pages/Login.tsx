@@ -39,7 +39,7 @@ const Login = () => {
           },
           body: JSON.stringify({
             email,
-            baseurl: "http://localhost:8080",
+            baseurl: "https://aeorank.netlify.app",
           }),
         }
       );
