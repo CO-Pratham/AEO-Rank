@@ -4,6 +4,12 @@
 /login          /index.html   200
 /signup         /index.html   200
 /onboarding     /index.html   200
+/verify         /index.html   200
+/verify-email   /index.html   200
+/verify-member  /index.html   200
+/user/verify/*  /index.html   200
+/oauth-callback /index.html   200
+/oauth/callback /index.html   200
 /agency         /index.html   200
 /pricing        /index.html   200
 /demo           /index.html   200
