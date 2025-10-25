@@ -327,6 +327,7 @@ const DashboardOverview = () => {
     totalSources,
     loading: sourcesLoading,
     error: sourcesError,
+    refetchSources,
   } = useSources();
   const { brand, loading: brandLoading, error: brandError } = useBrand();
   const [timeRange, setTimeRange] = useState("7d");
@@ -342,6 +343,27 @@ const DashboardOverview = () => {
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [hoveredBrand, setHoveredBrand] = useState<string | null>(null);
+
+  // Refetch data when component mounts or when there are errors
+  useEffect(() => {
+    const refetchData = async () => {
+      try {
+        console.log('🔄 DashboardOverview: Refetching all data...');
+        await Promise.all([
+          fetchVisibilityData(),
+          refetchSources(),
+        ]);
+        console.log('✅ DashboardOverview: All data refetched successfully');
+      } catch (error) {
+        console.error('❌ DashboardOverview: Error refetching data:', error);
+      }
+    };
+
+    // Only refetch if we're not already loading
+    if (!brandLoading && !sourcesLoading) {
+      refetchData();
+    }
+  }, [brandLoading, sourcesLoading]);
 
   const fetchVisibilityData = async () => {
     try {
@@ -724,6 +746,29 @@ const DashboardOverview = () => {
   // This ensures all data is loaded before showing the dashboard
   if (brandLoading || sourcesLoading) {
     return <LoadingScreen text="Loading dashboard data..." />;
+  }
+
+  // Show error state with retry button if there are errors
+  if (brandError || sourcesError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <div className="text-6xl">⚠️</div>
+          <h2 className="text-2xl font-bold text-foreground">Something went wrong</h2>
+          <p className="text-muted-foreground">
+            {brandError || sourcesError || "Failed to load dashboard data"}
+          </p>
+          <Button 
+            onClick={() => {
+              window.location.reload();
+            }}
+            className="mt-4"
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (

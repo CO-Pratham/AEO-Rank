@@ -134,20 +134,30 @@ export const SourcesProvider: React.FC<SourcesProviderProps> = ({ children }) =>
   };
 
   useEffect(() => {
-    try {
-      const path = window.location?.pathname || "";
-      if (path.startsWith('/dashboard')) {
-        console.log('🔄 SourcesContext: Fetching sources data...');
-        fetchSources();
-      } else {
-        console.log('⏹️ SourcesContext: Not on dashboard route, stopping loading');
+    const fetchData = async () => {
+      try {
+        const path = window.location?.pathname || "";
+        if (path.startsWith('/dashboard')) {
+          console.log('🔄 SourcesContext: Fetching sources data...');
+          await fetchSources();
+        } else {
+          console.log('⏹️ SourcesContext: Not on dashboard route, stopping loading');
+          setLoading(false);
+        }
+      } catch (error) {
+        console.log('⏹️ SourcesContext: Error in useEffect, stopping loading', error);
         setLoading(false);
       }
-    } catch {
-      console.log('⏹️ SourcesContext: Error in useEffect, stopping loading');
-      setLoading(false);
-    }
+    };
+
+    fetchData();
   }, []);
+
+  // Add a refetch function that can be called when needed
+  const refetchSources = async () => {
+    console.log('🔄 SourcesContext: Manual refetch triggered');
+    await fetchSources();
+  };
 
   const totalSources = sourcesTypeData.reduce((sum, item) => sum + item.value, 0);
 

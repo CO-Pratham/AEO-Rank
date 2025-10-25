@@ -27,13 +27,15 @@ const VerifyEmail = () => {
     }
 
     // Call backend to verify token
+    console.log("🔍 Verifying token:", token.substring(0, 20) + "...");
     fetch(`https://aeotest-production.up.railway.app/verify?token=${token}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     })
       .then(async (res) => {
+        console.log("📡 Verification response status:", res.status);
         const data = await res.json();
-        console.log("Verification response:", data);
+        console.log("📧 Verification response data:", data);
 
         if (res.ok) {
           console.log("📧 Full verification response:", JSON.stringify(data, null, 2));
@@ -167,12 +169,17 @@ const VerifyEmail = () => {
           navigate("/signup");
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error("❌ Verification error:", error);
         toast({
           title: "Network Error",
-          description: "Please try again.",
+          description: "Unable to verify email. Please check your connection and try again.",
           variant: "destructive",
         });
+        // Redirect to signup after a delay
+        setTimeout(() => {
+          navigate("/signup");
+        }, 3000);
       });
   }, [navigate, searchParams]);
 
