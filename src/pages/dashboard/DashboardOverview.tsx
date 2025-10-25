@@ -72,6 +72,7 @@ import {
   Lock,
   Check,
   ChevronDown,
+  RefreshCw,
 } from "lucide-react";
 import { LoadingScreen } from "@/components/ui/loading-spinner";
 import { getDomainLogo, generateInitials } from "@/utils/logoUtils";
@@ -357,23 +358,28 @@ const DashboardOverview = () => {
     return () => clearTimeout(timeout);
   }, []);
 
-  // Refetch data when component mounts
+  // Only fetch data once when component first mounts
   useEffect(() => {
     const refetchData = async () => {
       try {
-        console.log('🔄 DashboardOverview: Refetching all data...');
+        console.log('🔄 DashboardOverview: Initial data fetch...');
         await Promise.all([
           fetchVisibilityData(),
           refetchSources(),
         ]);
-        console.log('✅ DashboardOverview: All data refetched successfully');
+        console.log('✅ DashboardOverview: Initial data loaded successfully');
       } catch (error) {
-        console.error('❌ DashboardOverview: Error refetching data:', error);
+        console.error('❌ DashboardOverview: Error in initial data fetch:', error);
       }
     };
 
-    refetchData();
-  }, []);
+    // Only fetch if we don't have data yet
+    if (visibilityData.length === 0) {
+      refetchData();
+    } else {
+      console.log('📊 DashboardOverview: Data already available, skipping fetch');
+    }
+  }, []); // Empty dependency array - only run once
 
   const fetchVisibilityData = async () => {
     try {
@@ -795,6 +801,26 @@ const DashboardOverview = () => {
           <h1 className="text-lg font-semibold">Overview</h1>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              console.log('🔄 Manual refresh triggered');
+              try {
+                await Promise.all([
+                  fetchVisibilityData(),
+                  refetchSources(),
+                ]);
+                console.log('✅ Manual refresh completed');
+              } catch (error) {
+                console.error('❌ Manual refresh failed:', error);
+              }
+            }}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </Button>
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-[140px] h-9">
               <SelectValue />

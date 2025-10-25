@@ -151,8 +151,14 @@ export const SourcesProvider: React.FC<SourcesProviderProps> = ({ children }) =>
       try {
         const path = window.location?.pathname || "";
         if (path.startsWith('/dashboard')) {
-          console.log('🔄 SourcesContext: Fetching sources data...');
-          await fetchSources();
+          // Only fetch if we don't have data yet
+          if (!hasLoadedOnce && sourcesTypeData.length === 0 && topSourcesData.length === 0) {
+            console.log('🔄 SourcesContext: Initial fetch of sources data...');
+            await fetchSources();
+          } else {
+            console.log('📊 SourcesContext: Data already available, skipping fetch');
+            setLoading(false);
+          }
         } else {
           console.log('⏹️ SourcesContext: Not on dashboard route, stopping loading');
           setLoading(false);
@@ -164,7 +170,7 @@ export const SourcesProvider: React.FC<SourcesProviderProps> = ({ children }) =>
     };
 
     fetchData();
-  }, []);
+  }, []); // Empty dependency array - only run once
 
   // Add a refetch function that can be called when needed
   const refetchSources = async () => {
