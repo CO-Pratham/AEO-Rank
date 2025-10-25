@@ -343,6 +343,7 @@ const DashboardOverview = () => {
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [hoveredBrand, setHoveredBrand] = useState<string | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Refetch data when component mounts or when there are errors
   useEffect(() => {
@@ -356,13 +357,23 @@ const DashboardOverview = () => {
         console.log('✅ DashboardOverview: All data refetched successfully');
       } catch (error) {
         console.error('❌ DashboardOverview: Error refetching data:', error);
+      } finally {
+        setIsInitialLoad(false);
       }
     };
+
+    // Set a timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      console.log('⏰ DashboardOverview: Loading timeout reached, showing dashboard');
+      setIsInitialLoad(false);
+    }, 10000); // 10 second timeout
 
     // Only refetch if we're not already loading
     if (!brandLoading && !sourcesLoading) {
       refetchData();
     }
+
+    return () => clearTimeout(timeout);
   }, [brandLoading, sourcesLoading]);
 
   const fetchVisibilityData = async () => {
@@ -742,37 +753,42 @@ const DashboardOverview = () => {
     }
   };
 
-  // Show loading screen if either brand or sources are still loading (initial load)
-  // This ensures all data is loaded before showing the dashboard
-  if (brandLoading || sourcesLoading) {
+  // Show loading screen only during initial load with timeout
+  if (isInitialLoad && (brandLoading || sourcesLoading)) {
     return <LoadingScreen text="Loading dashboard data..." />;
   }
 
-  // Show error state with retry button if there are errors
-  if (brandError || sourcesError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <div className="text-6xl">⚠️</div>
-          <h2 className="text-2xl font-bold text-foreground">Something went wrong</h2>
-          <p className="text-muted-foreground">
-            {brandError || sourcesError || "Failed to load dashboard data"}
-          </p>
-          <Button 
-            onClick={() => {
-              window.location.reload();
-            }}
-            className="mt-4"
-          >
-            Retry
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  // Show error banner if there are errors, but still show dashboard
+  const hasErrors = brandError || sourcesError;
 
   return (
     <div className="space-y-4 pb-8">
+      {/* Error Banner */}
+      {hasErrors && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className="text-red-600">⚠️</div>
+              <div>
+                <h3 className="text-sm font-medium text-red-800">Some data failed to load</h3>
+                <p className="text-sm text-red-600">
+                  {brandError || sourcesError || "Failed to load dashboard data"}
+                </p>
+              </div>
+            </div>
+            <Button 
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                window.location.reload();
+              }}
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">

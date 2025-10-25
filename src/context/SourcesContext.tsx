@@ -51,12 +51,20 @@ export const SourcesProvider: React.FC<SourcesProviderProps> = ({ children }) =>
     setError(null);
     try {
       const token = localStorage.getItem('accessToken');
+      
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+      
       const response = await fetch('https://aeotest-production.up.railway.app/analyse/domain/get', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         console.log('❌ Sources API failed with status:', response.status);
