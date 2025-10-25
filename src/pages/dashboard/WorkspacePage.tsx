@@ -26,6 +26,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { apiCall } from "@/utils/api";
 
 import chatgptIcon from "@/assets/logos/chatgpt-icon.svg";
@@ -48,12 +54,13 @@ const WorkspacePage = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [showEditWarning, setShowEditWarning] = useState(false);
   const [isUpdatingBrand, setIsUpdatingBrand] = useState(false);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
 
   const [models, setModels] = useState({
     chatgpt: true,
     gpt4oSearch: false,
-    perplexity: true,
-    aiOverview: true,
+    perplexity: false,
+    aiOverview: false,
     aiMode: false,
     gemini: false,
     claudeSonnet4: false,
@@ -93,8 +100,8 @@ const WorkspacePage = () => {
       setModels({
         chatgpt: true,
         gpt4oSearch: false,
-        perplexity: true,
-        aiOverview: true,
+        perplexity: false,
+        aiOverview: false,
         aiMode: false,
         gemini: false,
         claudeSonnet4: false,
@@ -111,8 +118,8 @@ const WorkspacePage = () => {
       setModels({
         chatgpt: true,
         gpt4oSearch: false,
-        perplexity: true,
-        aiOverview: true,
+        perplexity: false,
+        aiOverview: false,
         aiMode: false,
         gemini: false,
         claudeSonnet4: false,
@@ -124,10 +131,16 @@ const WorkspacePage = () => {
 
 
   const handleModelToggle = (modelKey: string) => {
-    setModels((prev) => ({
-      ...prev,
-      [modelKey]: !prev[modelKey as keyof typeof prev],
-    }));
+    // Only allow ChatGPT to be toggled freely
+    if (modelKey === "chatgpt") {
+      setModels((prev) => ({
+        ...prev,
+        [modelKey]: !prev[modelKey as keyof typeof prev],
+      }));
+    } else {
+      // For all other models, show upgrade dialog
+      setShowUpgradeDialog(true);
+    }
   };
 
   const handleSave = async () => {
@@ -547,6 +560,37 @@ const WorkspacePage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Upgrade Plan Dialog */}
+      <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">Upgrade Plan!</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Upgrade your plan to use additional AI models.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Book a call or send an email to{" "}
+              <a 
+                href="mailto:support@aeorank.ai" 
+                className="text-blue-600 hover:text-blue-700 underline"
+              >
+                support@aeorank.ai
+              </a>
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <Button 
+              onClick={() => setShowUpgradeDialog(false)}
+              className="bg-black text-white hover:bg-black/90"
+            >
+              Write us
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

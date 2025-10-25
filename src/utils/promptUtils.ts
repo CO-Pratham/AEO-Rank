@@ -1,39 +1,123 @@
 // Prompt utility functions
 
-// Country to flag emoji mapping
+// Comprehensive Country to flag emoji mapping
+// Supports full names, common abbreviations, and variations
 export const COUNTRY_FLAGS: Record<string, string> = {
-  // Country names
-  India: "🇮🇳",
-  "United States": "🇺🇸",
-  "United Kingdom": "🇬🇧",
-  Canada: "🇨🇦",
-  Australia: "🇦🇺",
-  Germany: "🇩🇪",
-  France: "🇫🇷",
-  Japan: "🇯🇵",
-  China: "🇨🇳",
-  Brazil: "🇧🇷",
-  Mexico: "🇲🇽",
-  Spain: "🇪🇸",
-  Italy: "🇮🇹",
-  Netherlands: "🇳🇱",
-  Singapore: "🇸🇬",
-  // Country codes
-  IN: "🇮🇳",
-  US: "🇺🇸",
-  GB: "🇬🇧",
-  CA: "🇨🇦",
-  AU: "🇦🇺",
-  DE: "🇩🇪",
-  FR: "🇫🇷",
-  JP: "🇯🇵",
-  CN: "🇨🇳",
-  BR: "🇧🇷",
-  MX: "🇲🇽",
-  ES: "🇪🇸",
-  IT: "🇮🇹",
-  NL: "🇳🇱",
-  SG: "🇸🇬",
+  // Popular countries with variations
+  "united states": "🇺🇸", "usa": "🇺🇸", "us": "🇺🇸", "america": "🇺🇸",
+  "united kingdom": "🇬🇧", "uk": "🇬🇧", "britain": "🇬🇧", "england": "🇬🇧", "great britain": "🇬🇧", "gb": "🇬🇧",
+  "canada": "🇨🇦", "ca": "🇨🇦",
+  "australia": "🇦🇺", "au": "🇦🇺",
+  "germany": "🇩🇪", "de": "🇩🇪", "deutschland": "🇩🇪",
+  "india": "🇮🇳", "in": "🇮🇳", "bharat": "🇮🇳",
+  "france": "🇫🇷", "fr": "🇫🇷",
+  "japan": "🇯🇵", "jp": "🇯🇵",
+  "china": "🇨🇳", "cn": "🇨🇳", "prc": "🇨🇳",
+  "brazil": "🇧🇷", "br": "🇧🇷", "brasil": "🇧🇷",
+  "mexico": "🇲🇽", "mx": "🇲🇽",
+  "spain": "🇪🇸", "es": "🇪🇸", "españa": "🇪🇸",
+  "italy": "🇮🇹", "it": "🇮🇹", "italia": "🇮🇹",
+  "russia": "🇷🇺", "ru": "🇷🇺",
+  "south korea": "🇰🇷", "korea": "🇰🇷", "kr": "🇰🇷",
+  "netherlands": "🇳🇱", "nl": "🇳🇱", "holland": "🇳🇱",
+  "switzerland": "🇨🇭", "ch": "🇨🇭",
+  "sweden": "🇸🇪", "se": "🇸🇪",
+  "singapore": "🇸🇬", "sg": "🇸🇬",
+  "saudi arabia": "🇸🇦", "sa": "🇸🇦", "saudi": "🇸🇦",
+  "united arab emirates": "🇦🇪", "uae": "🇦🇪", "dubai": "🇦🇪", "ae": "🇦🇪",
+  "new zealand": "🇳🇿", "nz": "🇳🇿",
+  "ireland": "🇮🇪", "ie": "🇮🇪",
+  "belgium": "🇧🇪", "be": "🇧🇪",
+  "austria": "🇦🇹", "at": "🇦🇹",
+  "poland": "🇵🇱", "pl": "🇵🇱", "polska": "🇵🇱",
+  "norway": "🇳🇴", "no": "🇳🇴", "norge": "🇳🇴",
+  "denmark": "🇩🇰", "dk": "🇩🇰", "danmark": "🇩🇰",
+  "finland": "🇫🇮", "fi": "🇫🇮", "suomi": "🇫🇮",
+  "portugal": "🇵🇹", "pt": "🇵🇹",
+  "greece": "🇬🇷", "gr": "🇬🇷",
+  // African countries
+  "nigeria": "🇳🇬", "ng": "🇳🇬",
+  "south africa": "🇿🇦", "za": "🇿🇦",
+  "egypt": "🇪🇬", "eg": "🇪🇬",
+  "kenya": "🇰🇪", "ke": "🇰🇪",
+  "ghana": "🇬🇭", "gh": "🇬🇭",
+  "morocco": "🇲🇦", "ma": "🇲🇦",
+  "ethiopia": "🇪🇹", "et": "🇪🇹",
+  "tanzania": "🇹🇿", "tz": "🇹🇿",
+  "uganda": "🇺🇬", "ug": "🇺🇬",
+  "algeria": "🇩🇿", "dz": "🇩🇿",
+  // South American countries
+  "argentina": "🇦🇷", "ar": "🇦🇷",
+  "chile": "🇨🇱", "cl": "🇨🇱",
+  "colombia": "🇨🇴", "co": "🇨🇴",
+  "peru": "🇵🇪", "pe": "🇵🇪",
+  "venezuela": "🇻🇪", "ve": "🇻🇪",
+  "ecuador": "🇪🇨", "ec": "🇪🇨",
+  "bolivia": "🇧🇴", "bo": "🇧🇴",
+  "paraguay": "🇵🇾", "py": "🇵🇾",
+  "uruguay": "🇺🇾", "uy": "🇺🇾",
+  // Middle Eastern countries
+  "turkey": "🇹🇷", "tr": "🇹🇷", "türkiye": "🇹🇷",
+  "israel": "🇮🇱", "il": "🇮🇱",
+  "iran": "🇮🇷", "ir": "🇮🇷",
+  "iraq": "🇮🇶", "iq": "🇮🇶",
+  "qatar": "🇶🇦", "qa": "🇶🇦",
+  "kuwait": "🇰🇼", "kw": "🇰🇼",
+  "bahrain": "🇧🇭", "bh": "🇧🇭",
+  "oman": "🇴🇲", "om": "🇴🇲",
+  "jordan": "🇯🇴", "jo": "🇯🇴",
+  "lebanon": "🇱🇧", "lb": "🇱🇧",
+  "syria": "🇸🇾", "sy": "🇸🇾",
+  "yemen": "🇾🇪", "ye": "🇾🇪",
+  // Asian countries
+  "pakistan": "🇵🇰", "pk": "🇵🇰",
+  "bangladesh": "🇧🇩", "bd": "🇧🇩",
+  "indonesia": "🇮🇩", "id": "🇮🇩",
+  "thailand": "🇹🇭", "th": "🇹🇭",
+  "vietnam": "🇻🇳", "vn": "🇻🇳", "việt nam": "🇻🇳",
+  "philippines": "🇵🇭", "ph": "🇵🇭",
+  "malaysia": "🇲🇾", "my": "🇲🇾",
+  "taiwan": "🇹🇼", "tw": "🇹🇼",
+  "hong kong": "🇭🇰", "hk": "🇭🇰",
+  "sri lanka": "🇱🇰", "lk": "🇱🇰",
+  "nepal": "🇳🇵", "np": "🇳🇵",
+  "myanmar": "🇲🇲", "mm": "🇲🇲", "burma": "🇲🇲",
+  "cambodia": "🇰🇭", "kh": "🇰🇭",
+  "laos": "🇱🇦", "la": "🇱🇦",
+  "mongolia": "🇲🇳", "mn": "🇲🇳",
+  "afghanistan": "🇦🇫", "af": "🇦🇫",
+  // European countries
+  "czech republic": "🇨🇿", "cz": "🇨🇿", "czechia": "🇨🇿",
+  "romania": "🇷🇴", "ro": "🇷🇴",
+  "hungary": "🇭🇺", "hu": "🇭🇺",
+  "ukraine": "🇺🇦", "ua": "🇺🇦",
+  "croatia": "🇭🇷", "hr": "🇭🇷",
+  "bulgaria": "🇧🇬", "bg": "🇧🇬",
+  "slovakia": "🇸🇰", "sk": "🇸🇰",
+  "lithuania": "🇱🇹", "lt": "🇱🇹",
+  "latvia": "🇱🇻", "lv": "🇱🇻",
+  "estonia": "🇪🇪", "ee": "🇪🇪",
+  "slovenia": "🇸🇮", "si": "🇸🇮",
+  "luxembourg": "🇱🇺", "lu": "🇱🇺",
+  "iceland": "🇮🇸", "is": "🇮🇸",
+  "serbia": "🇷🇸", "rs": "🇷🇸",
+  "belarus": "🇧🇾", "by": "🇧🇾",
+  "bosnia": "🇧🇦", "ba": "🇧🇦", "bosnia and herzegovina": "🇧🇦",
+  "albania": "🇦🇱", "al": "🇦🇱",
+  "macedonia": "🇲🇰", "mk": "🇲🇰", "north macedonia": "🇲🇰",
+  "malta": "🇲🇹", "mt": "🇲🇹",
+  "cyprus": "🇨🇾", "cy": "🇨🇾",
+  // Caribbean & Central America
+  "costa rica": "🇨🇷", "cr": "🇨🇷",
+  "panama": "🇵🇦", "pa": "🇵🇦",
+  "cuba": "🇨🇺", "cu": "🇨🇺",
+  "dominican republic": "🇩🇴", "do": "🇩🇴",
+  "jamaica": "🇯🇲", "jm": "🇯🇲",
+  "puerto rico": "🇵🇷", "pr": "🇵🇷",
+  "guatemala": "🇬🇹", "gt": "🇬🇹",
+  "honduras": "🇭🇳", "hn": "🇭🇳",
+  "el salvador": "🇸🇻", "sv": "🇸🇻",
+  "nicaragua": "🇳🇮", "ni": "🇳🇮",
 };
 
 // Platform to domain mapping for favicon fetching
@@ -64,9 +148,15 @@ export const getDomainForBrand = (brandName: string): string => {
 };
 
 // Helper function to get country flag
+// Handles full names, abbreviations, and variations (case-insensitive)
 export const getCountryFlag = (location: string): string => {
   if (!location || location === "—") return "";
-  return COUNTRY_FLAGS[location] || COUNTRY_FLAGS[location.toUpperCase()] || "";
+  
+  // Normalize the location: lowercase and trim
+  const normalized = location.toLowerCase().trim();
+  
+  // Look up the flag using the normalized location
+  return COUNTRY_FLAGS[normalized] || "🌐";
 };
 
 // Helper function to calculate time ago

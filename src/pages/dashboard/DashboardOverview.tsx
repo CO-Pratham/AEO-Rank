@@ -75,6 +75,7 @@ import {
 } from "lucide-react";
 import { LoadingScreen } from "@/components/ui/loading-spinner";
 import { getDomainLogo, generateInitials } from "@/utils/logoUtils";
+import { getTimeAgo } from "@/utils/promptUtils";
 
 // AI Model Logos
 import ChatGPTIcon from "@/assets/logos/chatgpt-icon.svg";
@@ -91,70 +92,31 @@ import {
   TooltipProvider as UITooltipProvider,
   TooltipTrigger as UITooltipTrigger,
 } from "@/components/ui/tooltip";
-
-// Helper function to get country flag emoji
-const getCountryFlag = (location: string): string => {
-  if (!location) return '🌐'; // Default to globe for unknown location
-  
-  const loc = location.toLowerCase().trim();
-  
-  // Map country names to flag emojis
-  // Check more specific patterns first to avoid false matches
-  if (loc.includes('united kingdom') || loc.includes('uk') || loc.includes('britain') || loc.includes('england')) return '🇬🇧';
-  if (loc.includes('united states') || loc.includes('usa') || loc.includes('us')) return '🇺🇸';
-  if (loc.includes('india') || loc === 'in') return '🇮🇳'; // Only match exact 'in' to avoid matching words containing 'in'
-  if (loc.includes('canada') || loc === 'ca') return '🇨🇦';
-  if (loc.includes('australia') || loc === 'au') return '🇦🇺';
-  if (loc.includes('germany') || loc === 'de') return '🇩🇪';
-  if (loc.includes('france') || loc === 'fr') return '🇫🇷';
-  if (loc.includes('japan') || loc === 'jp') return '🇯🇵';
-  if (loc.includes('china') || loc === 'cn') return '🇨🇳';
-  if (loc.includes('brazil') || loc === 'br') return '🇧🇷';
-  if (loc.includes('mexico') || loc === 'mx') return '🇲🇽';
-  if (loc.includes('spain') || loc === 'es') return '🇪🇸';
-  if (loc.includes('italy') || loc === 'it') return '🇮🇹';
-  if (loc.includes('russia') || loc === 'ru') return '🇷🇺';
-  if (loc.includes('singapore') || loc === 'sg') return '🇸🇬';
-  if (loc.includes('netherlands') || loc === 'nl') return '🇳🇱';
-  if (loc.includes('sweden') || loc === 'se') return '🇸🇪';
-  if (loc.includes('switzerland') || loc === 'ch') return '🇨🇭';
-  
-  return '🌐'; // Generic globe for unknown countries
-};
+import { getCountryFlag } from "@/utils/promptUtils";
 
 // Helper function to get AI model logo
 const getModelLogo = (chat: any): string => {
-  const modelSources = [
-    chat?.model,
-    chat?.platform,
-    chat?.ai_model,
-    chat?.engine,
-    chat?.model_name,
-    chat?.provider,
-    chat?.source,
-    chat?.type
-  ];
+  // Backend sends model_name field
+  const modelName = chat?.model_name || chat?.model || chat?.ai_model || chat?.platform || chat?.engine || chat?.provider;
 
-  for (const source of modelSources) {
-    if (source && typeof source === 'string' && source.trim() !== '' && source.toLowerCase() !== 'unknown') {
-      const lowerSource = source.toLowerCase();
-      
-      // Return specific model logos
-      if (lowerSource.includes('gpt') || lowerSource.includes('openai') || lowerSource.includes('chatgpt')) {
-        return 'https://cdn.oaistatic.com/_next/static/media/apple-touch-icon.59f2e898.png';
-      }
-      if (lowerSource.includes('claude') || lowerSource.includes('anthropic')) {
-        return 'https://claude.ai/images/claude_app_icon.png';
-      }
-      if (lowerSource.includes('gemini') || lowerSource.includes('bard') || lowerSource.includes('google')) {
-        return 'https://www.gstatic.com/lamda/images/gemini_favicon_f069958c85030456e93de685481c559f160ea06b.png';
-      }
-      if (lowerSource.includes('perplexity')) {
-        return 'https://www.perplexity.ai/favicon.svg';
-      }
-      if (lowerSource.includes('copilot')) {
-        return 'https://www.bing.com/favicon.ico';
-      }
+  if (modelName && typeof modelName === 'string' && modelName.trim() !== '' && modelName.toLowerCase() !== 'unknown') {
+    const lowerModel = modelName.toLowerCase();
+    
+    // Return specific model logos
+    if (lowerModel.includes('gpt') || lowerModel.includes('openai') || lowerModel.includes('chatgpt')) {
+      return 'https://cdn.oaistatic.com/_next/static/media/apple-touch-icon.59f2e898.png';
+    }
+    if (lowerModel.includes('claude') || lowerModel.includes('anthropic')) {
+      return 'https://claude.ai/images/claude_app_icon.png';
+    }
+    if (lowerModel.includes('gemini') || lowerModel.includes('bard') || lowerModel.includes('google')) {
+      return 'https://www.gstatic.com/lamda/images/gemini_favicon_f069958c85030456e93de685481c559f160ea06b.png';
+    }
+    if (lowerModel.includes('perplexity')) {
+      return 'https://www.perplexity.ai/favicon.svg';
+    }
+    if (lowerModel.includes('copilot')) {
+      return 'https://www.bing.com/favicon.ico';
     }
   }
   
@@ -164,49 +126,15 @@ const getModelLogo = (chat: any): string => {
 
 // Helper function to format model names
 const formatModelName = (chat: any): string => {
-  // Log to debug what we're getting
-  console.log('Chat object for model detection:', chat);
+  // Backend sends model_name field directly
+  const modelName = chat?.model_name || chat?.model || chat?.ai_model || chat?.platform;
   
-  const modelSources = [
-    chat?.model,
-    chat?.platform,
-    chat?.ai_model,
-    chat?.engine,
-    chat?.model_name,
-    chat?.provider,
-    chat?.source,
-    chat?.type
-  ];
-
-  console.log('Model sources:', modelSources);
-
-  for (const source of modelSources) {
-    if (source && typeof source === 'string' && source.trim() !== '' && source.toLowerCase() !== 'unknown') {
-      const lowerSource = source.toLowerCase();
-      
-      // Check for specific models
-      if (lowerSource.includes('gpt-4')) return 'GPT-4';
-      if (lowerSource.includes('gpt-3.5') || lowerSource.includes('gpt3.5')) return 'GPT-3.5';
-      if (lowerSource.includes('gpt')) return 'ChatGPT';
-      if (lowerSource.includes('claude-3')) return 'Claude 3';
-      if (lowerSource.includes('claude')) return 'Claude';
-      if (lowerSource.includes('gemini')) return 'Gemini';
-      if (lowerSource.includes('palm')) return 'PaLM';
-      if (lowerSource.includes('llama')) return 'LLaMA';
-      if (lowerSource.includes('mistral')) return 'Mistral';
-      if (lowerSource.includes('perplexity')) return 'Perplexity';
-      if (lowerSource.includes('copilot')) return 'Copilot';
-      if (lowerSource.includes('bard')) return 'Bard';
-      if (lowerSource.includes('openai')) return 'OpenAI';
-      if (lowerSource.includes('anthropic')) return 'Claude';
-      if (lowerSource.includes('google')) return 'Gemini';
-      
-      // Return capitalized version if no match
-      return source.charAt(0).toUpperCase() + source.slice(1);
-    }
+  if (modelName && typeof modelName === 'string' && modelName.trim() !== '' && modelName.toLowerCase() !== 'unknown') {
+    // Return the actual value from API
+    return modelName;
   }
   
-  return 'AI Overview';
+  return 'AI Model';
 };
 
 // Helper function to parse markdown to HTML
@@ -413,6 +341,7 @@ const DashboardOverview = () => {
   const [recentChats, setRecentChats] = useState<any[]>([]);
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [hoveredBrand, setHoveredBrand] = useState<string | null>(null);
 
   const fetchVisibilityData = async () => {
     try {
@@ -481,18 +410,43 @@ const DashboardOverview = () => {
           }
         };
         
-        const daysCount = getDaysCount();
+        // Find the earliest date from actual data
+        let earliestDate: Date | null = null;
+        if (Array.isArray(data) && data.length > 0) {
+          data.forEach((item: any) => {
+            const itemDate = item.date || item.timestamp || item.created_at;
+            if (itemDate) {
+              const date = new Date(itemDate);
+              if (!earliestDate || date < earliestDate) {
+                earliestDate = date;
+              }
+            }
+          });
+        }
+        
         const today = new Date();
+        const requestedDaysCount = getDaysCount();
+        
+        // Calculate actual days since account creation/first data
+        let actualDaysCount = requestedDaysCount;
+        if (earliestDate) {
+          const daysSinceCreation = Math.ceil((today.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          // Use minimum of requested days and actual days since creation (with minimum of 2 days)
+          actualDaysCount = Math.max(2, Math.min(requestedDaysCount, daysSinceCreation));
+        }
+        
         const uniqueDates: string[] = [];
         
-        // Generate all dates in the range (from oldest to newest)
-        for (let i = daysCount - 1; i >= 0; i--) {
+        // Generate dates from earliest to today (only for actual days)
+        for (let i = actualDaysCount - 1; i >= 0; i--) {
           const date = new Date(today);
           date.setDate(today.getDate() - i);
           uniqueDates.push(date.toISOString().split("T")[0]);
         }
         
         console.log(`📅 Generated date range for ${timeRange}:`, uniqueDates);
+        console.log(`📅 Account created: ${earliestDate ? earliestDate.toISOString().split('T')[0] : 'unknown'}`);
+        console.log(`📅 Days shown: ${actualDaysCount} (requested: ${requestedDaysCount})`);
 
         // Get all unique brands from both analysis data AND user competitors
         const brandsFromAnalysis =
@@ -766,9 +720,9 @@ const DashboardOverview = () => {
     }
   };
 
-  // Only show loading screen if BOTH are still loading (initial load)
-  // This prevents indefinite loading if one API fails or returns quickly
-  if (sourcesLoading && brandLoading) {
+  // Show loading screen if either brand or sources are still loading (initial load)
+  // This ensures all data is loaded before showing the dashboard
+  if (brandLoading || sourcesLoading) {
     return <LoadingScreen text="Loading dashboard data..." />;
   }
 
@@ -932,31 +886,34 @@ const DashboardOverview = () => {
                   }}
                 />
                 {competitorVisibilityData.length > 0
-                  ? competitorVisibilityData.map((competitor, index) => {
-                      const color = BRAND_COLORS[index % BRAND_COLORS.length];
-                      return (
-                        <Line
-                          key={competitor.brand}
-                          type="monotone"
-                          dataKey={competitor.brand}
-                          stroke={color}
-                          strokeWidth={2}
-                          dot={{
-                            r: 4,
-                            fill: color,
-                            strokeWidth: 2,
-                            stroke: color,
-                          }}
-                          activeDot={{
-                            r: 6,
-                            fill: color,
-                            strokeWidth: 2,
-                            stroke: "#fff",
-                          }}
-                          connectNulls={false}
-                        />
-                      );
-                    })
+                  ? competitorVisibilityData
+                      .filter((competitor) => 
+                        !hoveredBrand || competitor.brand === hoveredBrand
+                      )
+                      .map((competitor, index) => {
+                        // Find original index for consistent color
+                        const originalIndex = competitorVisibilityData.findIndex(
+                          c => c.brand === competitor.brand
+                        );
+                        const color = BRAND_COLORS[originalIndex % BRAND_COLORS.length];
+                        return (
+                          <Line
+                            key={competitor.brand}
+                            type="monotone"
+                            dataKey={competitor.brand}
+                            stroke={color}
+                            strokeWidth={2}
+                            dot={false}
+                            activeDot={{
+                              r: 6,
+                              fill: color,
+                              strokeWidth: 2,
+                              stroke: "#fff",
+                            }}
+                            connectNulls={false}
+                          />
+                        );
+                      })
                   : null}
               </LineChart>
             </ResponsiveContainer>
@@ -1087,17 +1044,29 @@ const DashboardOverview = () => {
                     <TableBody>
                       {competitorVisibilityData.map((competitor, index) => {
                         const isOurBrand = competitor.brand === brand?.name;
+                        const isHovered = hoveredBrand === competitor.brand;
                         return (
                           <TableRow
                             key={competitor.id || index}
-                            className={`hover:bg-muted/50 border-b last:border-0 ${
+                            className={`hover:bg-muted/50 border-b last:border-0 transition-colors ${
                               isOurBrand
                                 ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/50 dark:border-blue-800/30"
                                 : ""
                             }`}
+                            onMouseEnter={() => setHoveredBrand(competitor.brand)}
+                            onMouseLeave={() => setHoveredBrand(null)}
                           >
                             <TableCell className="text-xs text-muted-foreground pl-6 py-3 border-r">
-                              {index + 1}
+                              <div className="flex items-center justify-start min-w-[24px]">
+                                {isHovered ? (
+                                  <div
+                                    className="w-3 h-3 rounded-full ring-2 ring-white dark:ring-gray-900"
+                                    style={{ backgroundColor: competitor.color }}
+                                  />
+                                ) : (
+                                  <span>{index + 1}</span>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="py-3 border-r">
                               <div className="flex items-center gap-2.5">
@@ -1335,63 +1304,77 @@ const DashboardOverview = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {topSourcesData.map((source) => (
-                    <TableRow
-                      key={source.id}
-                      className="hover:bg-muted/50 border-b last:border-0"
-                    >
-                      <TableCell className="py-3 pl-6">
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 rounded-sm bg-muted/30 flex items-center justify-center">
-                            <img
-                              src={source.icon}
-                              alt={source.domain}
-                              className="w-4 h-4 rounded-sm"
-                              onError={(e) => {
-                                e.currentTarget.style.display = "none";
-                                const fallback = e.currentTarget
-                                  .nextElementSibling as HTMLElement | null;
-                                if (fallback) fallback.style.display = "flex";
+                  {topSourcesData.length > 0 ? (
+                    topSourcesData.map((source) => (
+                      <TableRow
+                        key={source.id}
+                        className="hover:bg-muted/50 border-b last:border-0"
+                      >
+                        <TableCell className="py-3 pl-6">
+                          <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 rounded-sm bg-muted/30 flex items-center justify-center">
+                              <img
+                                src={source.icon}
+                                alt={source.domain}
+                                className="w-4 h-4 rounded-sm"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                  const fallback = e.currentTarget
+                                    .nextElementSibling as HTMLElement | null;
+                                  if (fallback) fallback.style.display = "flex";
+                                }}
+                              />
+                              <span
+                                className="text-xs font-semibold text-muted-foreground hidden"
+                                style={{ display: "none" }}
+                              >
+                                {source.domain?.charAt(0).toUpperCase() || "D"}
+                              </span>
+                            </div>
+                            <a
+                              href={`https://${source.domain}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
                               }}
-                            />
-                            <span
-                              className="text-xs font-semibold text-muted-foreground hidden"
-                              style={{ display: "none" }}
                             >
-                              {source.domain?.charAt(0).toUpperCase() || "D"}
-                            </span>
+                              {source.domain}
+                            </a>
                           </div>
-                          <a
-                            href={`https://${source.domain}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors cursor-pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                            }}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-semibold py-3">
+                          {source.used}
+                        </TableCell>
+                        <TableCell className="text-right text-sm py-3">
+                          {source.avgCitations}
+                        </TableCell>
+                        <TableCell className="text-right py-3 pr-6">
+                          <Badge
+                            variant="secondary"
+                            className={`text-xs px-2 py-1 font-medium rounded ${getTypeColor(
+                              source.type
+                            )}`}
                           >
-                            {source.domain}
-                          </a>
+                            {source.type}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="py-8 text-center">
+                        <div className="flex flex-col items-center justify-center text-muted-foreground">
+                          <div className="w-8 h-8 bg-muted/20 rounded-lg flex items-center justify-center mb-2">
+                            <Globe2 className="w-4 h-4" />
+                          </div>
+                          <p className="text-sm font-medium">No domain data available</p>
+                          <p className="text-xs mt-1">Domain information will appear here once available</p>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right text-sm font-semibold py-3">
-                        {source.used}
-                      </TableCell>
-                      <TableCell className="text-right text-sm py-3">
-                        {source.avgCitations}
-                      </TableCell>
-                      <TableCell className="text-right py-3 pr-6">
-                        <Badge
-                          variant="secondary"
-                          className={`text-xs px-2 py-1 font-medium rounded ${getTypeColor(
-                            source.type
-                          )}`}
-                        >
-                          {source.type}
-                        </Badge>
-                      </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -1399,96 +1382,141 @@ const DashboardOverview = () => {
         </div>
       </div>
 
-      <Card className="border">
-        <CardHeader className="pb-4 border-b">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base font-semibold">Recent Chats</CardTitle>
-              <CardDescription className="text-sm text-muted-foreground mt-1">
-                Chats that mentioned {brand?.name || "your brand"}
-              </CardDescription>
-            </div>
+      {/* Recent Chats Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Recent Chats</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Chats that mentioned {brand?.name || "your brand"}
+            </p>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {recentChats.length > 0 ? (
-            <div className="divide-y">
-              {recentChats.map((chat, index) => (
-                <div
-                  key={index}
-                  className="group flex items-start gap-4 p-4 cursor-pointer hover:bg-muted/30 transition-colors"
-                  onClick={() => {
-                    setSelectedChat(chat);
-                    setIsDialogOpen(true);
-                  }}
-                >
-                  {/* Success Indicator */}
-                  <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
-                      <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+        </div>
+
+        {recentChats.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {recentChats.map((chat, index) => (
+              <Card
+                key={index}
+                className="group cursor-pointer hover:shadow-md transition-all duration-200 hover:border-blue-300 border-border/40"
+                onClick={() => {
+                  setSelectedChat(chat);
+                  setIsDialogOpen(true);
+                }}
+              >
+                <CardContent className="p-3.5">
+                  {/* Success Indicator & Prompt */}
+                  <div className="flex items-start gap-2 mb-2">
+                    <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-green-500 flex items-center justify-center">
+                        <svg className="w-1.5 h-1.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {/* Backend sends prompt field */}
+                      <p className="text-xs font-medium text-foreground line-clamp-2 leading-relaxed">
+                        {chat.prompt || chat.question || chat.query || chat.user_query || chat.title || "Chat message"}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    {/* Title/Prompt */}
-                    <h3 className="text-sm font-medium text-foreground mb-3 line-clamp-2">
-                      {chat.prompt || chat.question || chat.query || chat.user_query || chat.title || "Chat message"}
-                    </h3>
+                  {/* AI Response Preview */}
+                  <div className="mb-2.5">
+                    {/* Backend sends response field */}
+                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                      {(chat.response || chat.answer || chat.ai_response || "No response available")
+                        .replace(/[*#_`\[\]]/g, '') // Remove markdown symbols
+                        .substring(0, 120)}
+                      {(chat.response || chat.answer || chat.ai_response || "").length > 120 && '...'}
+                    </p>
+                  </div>
 
-                    {/* Meta Info */}
-                    <div className="flex items-center gap-3 flex-wrap">
-                      {/* AI Model Badge */}
-                      <div className="flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-md">
-                        <MessageSquare className="w-3 h-3 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">
+                  {/* Meta Info - AI Model and Time */}
+                  <div className="pt-2.5 border-t border-border/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        {getModelLogo(chat) && (
+                          <img 
+                            src={getModelLogo(chat)} 
+                            alt="AI" 
+                            className="w-4 h-4 rounded-full"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        )}
+                        <span className="text-xs text-muted-foreground font-medium">
                           {formatModelName(chat)}
                         </span>
+                        
+                        {/* Brand Mentions - Compact with logos */}
+                        {(() => {
+                          const mentions = chat.mentions || chat.brands || chat.brand_mentions;
+                          if (!mentions || (typeof mentions === 'object' && Object.keys(mentions).length === 0)) {
+                            return null;
+                          }
+                          
+                          const brandEntries = Object.entries(mentions).filter(([_, count]) => Number(count) > 0);
+                          if (brandEntries.length === 0) {
+                            return null;
+                          }
+                          
+                          return (
+                            <div className="flex items-center gap-1 ml-2">
+                              {brandEntries.slice(0, 2).map(([brandName, count]: [string, any], index: number) => {
+                                const domain = `${brandName.toLowerCase().replace(/\s+/g, '').replace(/\./g, '')}.com`;
+                                return (
+                                  <div key={index} className="flex items-center gap-1">
+                                    <img 
+                                      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} 
+                                      alt={brandName}
+                                      className="w-3 h-3 rounded"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                      }}
+                                    />
+                                    <span className="text-xs text-muted-foreground font-medium">
+                                      {brandName}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                              {brandEntries.length > 2 && (
+                                <span className="text-xs text-muted-foreground">
+                                  +{brandEntries.length - 2}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
-
-                      {/* Location Badge if available */}
-                      {(chat.location || chat.country) && (
-                        <div className="flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-md">
-                          <Globe2 className="w-3 h-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">
-                            {chat.location || chat.country}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Timestamp */}
                       <span className="text-xs text-muted-foreground">
-                        {chat.timestamp || chat.created_at || chat.date || chat.chat_date
-                          ? new Date(chat.timestamp || chat.created_at || chat.date || chat.chat_date).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })
-                          : "Recent"}
+                        {(() => {
+                          // Backend sends created_at field
+                          const dateValue = chat.created_at || chat.timestamp || chat.date || chat.chat_date || chat.created;
+                          return dateValue ? getTimeAgo(dateValue) : 'Recent';
+                        })()}
                       </span>
                     </div>
                   </div>
-
-                  {/* Arrow Icon */}
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity mt-1">
-                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="border-border/40">
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <div className="w-12 h-12 bg-muted/20 rounded-lg flex items-center justify-center mb-3">
                 <MessageSquare className="w-6 h-6 text-muted-foreground" />
               </div>
               <p className="text-sm text-foreground font-medium">No recent chats available</p>
               <p className="text-xs text-muted-foreground mt-1">Conversations will appear here once available</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
@@ -1510,14 +1538,14 @@ const DashboardOverview = () => {
                       <img 
                         src={getModelLogo(selectedChat)} 
                         alt="AI" 
-                        className="w-3.5 h-3.5 rounded-full"
+                        className="w-4 h-4 rounded-full"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
                         }}
                       />
                     )}
                     <span className="text-xs font-medium text-foreground">
-                      {formatModelName(selectedChat)}
+                      {formatModelName(selectedChat) === 'GPT' ? 'ChatGPT' : formatModelName(selectedChat)}
                     </span>
                   </div>
 
@@ -1604,11 +1632,58 @@ const DashboardOverview = () => {
                     {/* Brands Section */}
                     <div>
                       <h3 className="text-sm font-semibold text-foreground mb-3">Brands</h3>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                        </svg>
-                        <span>No brands mentioned</span>
+                      <div className="space-y-2">
+                        {(() => {
+                          // Backend sends mentions as object: { "BrandName": count, ... }
+                          const mentions = selectedChat.mentions || selectedChat.brands || selectedChat.brand_mentions;
+                          
+                          if (!mentions || (typeof mentions === 'object' && Object.keys(mentions).length === 0)) {
+                            return (
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                </svg>
+                                <span>No brands mentioned</span>
+                              </div>
+                            );
+                          }
+
+                          // Convert mentions object to array and filter brands with count > 0
+                          const brandEntries = Object.entries(mentions).filter(([_, count]) => Number(count) > 0);
+                          
+                          if (brandEntries.length === 0) {
+                            return (
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                </svg>
+                                <span>No brands mentioned</span>
+                              </div>
+                            );
+                          }
+
+                          return brandEntries.map(([brandName, count]: [string, any], index: number) => {
+                            // Generate domain from brand name
+                            const domain = `${brandName.toLowerCase().replace(/\s+/g, '').replace(/\./g, '')}.com`;
+                            
+                            return (
+                              <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted/30 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                  <img 
+                                    src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                                    alt=""
+                                    className="w-4 h-4 rounded"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                  <span className="text-xs font-medium text-foreground">{brandName}</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground font-semibold">×{count}</span>
+                              </div>
+                            );
+                          });
+                        })()}
                       </div>
                     </div>
 
@@ -1616,31 +1691,42 @@ const DashboardOverview = () => {
                     <div>
                       <h3 className="text-sm font-semibold text-foreground mb-3">Sources</h3>
                       <div className="space-y-3">
-                        {/* Extract and display sources from response */}
                         {(() => {
-                          const response = selectedChat.response || selectedChat.answer || selectedChat.ai_response || "";
-                          const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g;
-                          const rawUrls: string[] = response.match(urlRegex) || [];
+                          // Backend sends sources as array of domain strings: ["data.ai", "appfollow.io"]
+                          const sources = selectedChat.sources || selectedChat.citations || selectedChat.source_urls || [];
+                          const sourceArray = Array.isArray(sources) ? sources : [];
                           
-                          // Clean URLs - remove trailing punctuation
-                          const cleanedUrls = rawUrls.map(url => {
-                            // Remove trailing punctuation like ), ., ,, ;, etc.
-                            return url.replace(/[.,;:)\]]+$/, '');
-                          });
-                          
-                          const uniqueUrls: string[] = [...new Set(cleanedUrls)];
-
-                          if (uniqueUrls.length === 0) {
+                          if (sourceArray.length === 0) {
                             return (
                               <p className="text-sm text-muted-foreground">No sources found</p>
                             );
                           }
 
-                          return uniqueUrls.map((url: string, index: number) => {
+                          return sourceArray.map((sourceItem: any, index: number) => {
                             try {
-                              const urlObj = new URL(url);
-                              const domain = urlObj.hostname.replace('www.', '');
-                              const title = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
+                              // Backend sends domain strings, construct full URL
+                              let domain = '';
+                              let url = '';
+                              
+                              if (typeof sourceItem === 'string') {
+                                // If it's already a URL
+                                if (sourceItem.startsWith('http://') || sourceItem.startsWith('https://')) {
+                                  url = sourceItem;
+                                  const urlObj = new URL(sourceItem);
+                                  domain = urlObj.hostname.replace('www.', '');
+                                } else {
+                                  // It's just a domain like "data.ai"
+                                  domain = sourceItem.replace('www.', '');
+                                  url = `https://${domain}`;
+                                }
+                              } else if (sourceItem && typeof sourceItem === 'object') {
+                                domain = sourceItem.domain || sourceItem.url || '';
+                                url = sourceItem.url || `https://${domain}`;
+                              }
+                              
+                              if (!domain) return null;
+                              
+                              const displayTitle = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
                               
                               return (
                                 <a
@@ -1662,7 +1748,7 @@ const DashboardOverview = () => {
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <h4 className="text-xs font-medium text-foreground mb-0.5 truncate group-hover:text-blue-600">
-                                      {title}
+                                      {displayTitle}
                                     </h4>
                                     <p className="text-xs text-muted-foreground truncate">
                                       {domain}

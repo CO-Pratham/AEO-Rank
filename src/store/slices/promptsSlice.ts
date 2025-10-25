@@ -148,7 +148,7 @@ const processPromptData = (item: any): Prompt => {
             color: PLATFORM_COLORS[platform] || PLATFORM_COLORS[extractBrandName(platform)] || "#6b7280",
             count: Number(count) || 0,
           }))
-          .filter((m) => m.count > 0);
+          .filter((m) => m.count > 0); // Only show mentions with visibility > 0
       }
       // Format 2: Array of mention objects with url/platform/client fields
       else if (Array.isArray(item.mentions)) {
@@ -185,9 +185,11 @@ const processPromptData = (item: any): Prompt => {
   return {
     id: item.id,
     prompt: item.prompt || "No prompt text",
-    visibility: item.visibility !== undefined ? `${item.visibility}%` : "—",
-    sentiment: item.sentiment || "—",
-    position: item.position ? `#${item.position}` : "—",
+    visibility: item.visibility !== undefined && item.visibility !== null 
+      ? (item.visibility === 0 ? "0" : `${item.visibility}%`) 
+      : "—",
+    sentiment: item.sentiment !== undefined && item.sentiment !== null ? item.sentiment : "—",
+    position: item.position !== undefined && item.position !== null ? `#${item.position}` : "—",
     mentions: mentionsArray,
     volume: volumeBars,
     volumeValue: volumeValue,

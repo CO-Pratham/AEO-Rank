@@ -3,6 +3,10 @@ import { useDispatch, useSelector } from "react-redux";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import ChatGPTIcon from "@/assets/logos/chatgpt-icon.svg";
+import ClaudeIcon from "@/assets/logos/claude-ai-icon.svg";
+import GeminiIcon from "@/assets/logos/google-gemini-icon.svg";
+import PerplexityIcon from "@/assets/logos/perplexity-ai-icon.svg";
 import {
   Dialog,
   DialogContent,
@@ -75,7 +79,7 @@ const BillingPage = () => {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-  // Pricing plans - Updated to match actual pricing from PricingSection.tsx
+  // Pricing plans - Updated to match exactly with PricingSection.tsx
   const pricingPlans: PricingPlan[] = [
     {
       id: "starter",
@@ -107,7 +111,7 @@ const BillingPage = () => {
       features: [
         "Up to 5 brands monitored",
         "All 5+ AI platforms tracked",
-        "Up to 50 prompts",
+        "Upto 50 prompts",
         "Advanced analytics & insights",
         "Real-time alerts",
         "Competitor analysis",
@@ -356,109 +360,117 @@ const BillingPage = () => {
 
 
       {/* Pricing Plans */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         <h2 className="text-lg font-semibold">Available Plans</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {pricingPlans.map((plan) => {
             const isCurrentPlan = plan.name === subscription.plan;
             const isUpgrade = plan.price > subscription.amount;
             
             return (
-              <Card 
-                key={plan.id} 
-                className={`relative transition-all duration-300 hover:shadow-xl hover:-translate-y-1 flex flex-col group ${
-                  plan.popular ? 'ring-2 ring-purple-500 shadow-xl bg-gradient-to-br from-purple-50 to-blue-50' : 'hover:shadow-lg'
-                } ${isCurrentPlan ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 ring-1 ring-blue-200' : 'hover:border-purple-200'}`}
+              <div
+                key={plan.id}
+                className={`relative rounded-2xl border-2 p-6 flex flex-col bg-white ${
+                  plan.popular
+                    ? "border-gray-900 shadow-xl"
+                    : isCurrentPlan 
+                      ? "border-blue-500 shadow-lg"
+                      : "border-gray-200"
+                }`}
               >
                 {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
-                    <Badge className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-1.5 font-semibold shadow-lg animate-pulse">
-                      <Star className="w-3 h-3 mr-1" />
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
                       Most Popular
-                    </Badge>
+                    </span>
                   </div>
                 )}
-                
-                <CardHeader className="text-center pb-4">
-                  <div className={`w-12 h-12 rounded-full ${plan.color} flex items-center justify-center mx-auto mb-3`}>
-                    {plan.icon}
+
+                {isCurrentPlan && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="bg-blue-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                      Current Plan
+                    </span>
                   </div>
-                  <CardTitle className="text-lg">{plan.name}</CardTitle>
-                  <div className="space-y-1">
-                    <div className="text-3xl font-bold">
+                )}
+
+                <div className="mb-6">
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">
+                    {plan.name}
+                  </h3>
+                  <div className="flex items-baseline gap-1 mb-3">
+                    <span className="text-4xl font-bold text-gray-900">
                       {plan.id === 'enterprise' ? 'Custom' : formatCurrency(plan.price)}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {plan.id === 'enterprise' ? 'Contact Sales' : `per ${plan.interval}`}
-                    </div>
+                    </span>
+                    {plan.id !== 'enterprise' && (
+                      <span className="text-gray-600 text-sm">/{plan.interval}</span>
+                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground">{plan.description}</p>
-                </CardHeader>
-                
-                <CardContent className="space-y-4 flex flex-col flex-grow">
-                  <ul className="space-y-2 flex-grow">
-                    {plan.features.map((feature, index) => (
-                      <li key={index} className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    {plan.description}
+                  </p>
+                </div>
+
+                <Button
+                  variant={plan.popular ? "default" : "outline"}
+                  className={`w-full mb-6 ${
+                    isCurrentPlan
+                      ? "bg-gray-100 text-gray-500 cursor-not-allowed border border-gray-200"
+                      : plan.popular
+                        ? "bg-black hover:bg-black/90 text-white"
+                        : "border-gray-300 hover:bg-gray-50"
+                  }`}
+                  disabled={isCurrentPlan}
+                  onClick={() => {
+                    if (isCurrentPlan) return;
+                    
+                    if (plan.id === 'enterprise') {
+                      window.open('mailto:support@aeorank.ai?subject=Enterprise Contact', '_blank');
+                    } else if (isUpgrade) {
+                      handleUpgrade(plan.id);
+                    } else {
+                      handleUpgrade(plan.id);
+                    }
+                  }}
+                >
+                  {isCurrentPlan ? (
+                    "Current Plan"
+                  ) : plan.id === 'enterprise' ? (
+                    "Contact Sales →"
+                  ) : isUpgrade ? (
+                    "Upgrade Now →"
+                  ) : (
+                    "Change Plan →"
+                  )}
+                </Button>
+
+                <div className="space-y-3 flex-1">
+                  {plan.features.map((feature, idx) => (
+                    <div key={idx} className="flex items-start gap-3">
+                      <CheckCircle className="w-5 h-5 text-gray-900 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-gray-700">
                         {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  
-                  <div className="mt-auto">
-                    <Button
-                      className={`w-full h-12 font-semibold text-sm transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg ${
-                        isCurrentPlan 
-                          ? 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-500 cursor-not-allowed border border-gray-200 shadow-sm' 
-                          : plan.id === 'enterprise'
-                            ? 'bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 hover:from-orange-600 hover:via-orange-700 hover:to-red-600 text-white shadow-lg hover:shadow-orange-500/25 border-0'
-                            : isUpgrade 
-                              ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-600 hover:from-blue-600 hover:via-purple-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-purple-500/25 border-0' 
-                              : 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-600 hover:from-gray-200 hover:to-gray-300 border border-gray-200 shadow-sm hover:shadow-md'
-                      }`}
-                      disabled={isCurrentPlan}
-                      onClick={() => {
-                        if (!isCurrentPlan) {
-                          if (plan.id === 'enterprise') {
-                            // Handle Enterprise contact sales
-                            window.open('mailto:sales@yourcompany.com?subject=Enterprise Plan Inquiry', '_blank');
-                          } else {
-                            handleUpgrade(plan.id);
-                          }
-                        }
-                      }}
-                    >
-                      <span className="flex items-center justify-center gap-2">
-                        {isCurrentPlan ? (
-                          <>
-                            <CheckCircle className="w-4 h-4" />
-                            Current Plan
-                          </>
-                        ) : plan.id === 'enterprise' ? (
-                          <>
-                            <Star className="w-4 h-4" />
-                            Contact Sales
-                            <ArrowRight className="w-4 h-4" />
-                          </>
-                        ) : isUpgrade ? (
-                          <>
-                            <TrendingUp className="w-4 h-4" />
-                            Upgrade Now
-                            <ArrowRight className="w-4 h-4" />
-                          </>
-                        ) : (
-                          <>
-                            <TrendingDown className="w-4 h-4" />
-                            Downgrade
-                          </>
-                        )}
                       </span>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                    </div>
+                  ))}
+                </div>
+              </div>
             );
           })}
+        </div>
+
+        {/* Bottom Note */}
+        <div className="mt-8 text-center">
+          <div className="inline-flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-6 py-3 rounded-lg">
+            <span className="text-gray-900 font-medium">+</span>
+            <span>Add Gemini, AI Mode, Claude, DeepSeek, Llama, Grok and more for an additional fee.</span>
+            <div className="flex items-center gap-1">
+              <img src={GeminiIcon} alt="" className="w-4 h-4" />
+              <img src={ClaudeIcon} alt="" className="w-4 h-4" />
+              <img src={ChatGPTIcon} alt="" className="w-4 h-4" />
+              <img src={PerplexityIcon} alt="" className="w-4 h-4" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -515,145 +527,107 @@ const BillingPage = () => {
 
       {/* Upgrade Confirmation Dialog */}
       <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
-        <DialogContent className="max-w-md mx-auto">
-          <div className="relative">
-            {/* Gradient Background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-50 rounded-lg -m-6"></div>
-            
-            <DialogHeader className="relative z-10 pb-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-white" />
-                </div>
-                <DialogTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Upgrade Plan
-                </DialogTitle>
-              </div>
-              <DialogDescription className="text-base text-gray-600 leading-relaxed">
-                {selectedPlan === 'enterprise' 
-                  ? '🚀 Enterprise plans offer unlimited features with custom pricing tailored to your needs. Our sales team will contact you within 24 hours.'
-                  : `✨ You're about to upgrade to the ${pricingPlans.find(p => p.id === selectedPlan)?.name} plan and unlock powerful new features!`
-                }
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-6 relative z-10">
-              {selectedPlan && (
-                <div className="bg-white/80 backdrop-blur-sm border border-white/20 p-6 rounded-xl shadow-lg">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className={`w-12 h-12 rounded-full ${pricingPlans.find(p => p.id === selectedPlan)?.color} flex items-center justify-center`}>
-                      {pricingPlans.find(p => p.id === selectedPlan)?.icon}
-                    </div>
-                    <div>
-                      <h4 className="text-lg font-bold text-gray-900">
-                        {pricingPlans.find(p => p.id === selectedPlan)?.name}
-                      </h4>
-                      <p className="text-sm text-gray-600">
+        <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-6 border-b border-gray-200">
+            <DialogTitle className="text-xl font-semibold text-gray-900">
+              {selectedPlan === 'enterprise' ? 'Contact Sales' : 'Upgrade Plan'}
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 mt-2">
+              {selectedPlan === 'enterprise' 
+                ? 'Get a custom quote for your enterprise requirements'
+                : `Upgrade to ${pricingPlans.find(p => p.id === selectedPlan)?.name} plan`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedPlan && (
+            <div className="space-y-6 py-6">
+              {/* Plan Overview */}
+              <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-white rounded-lg border border-gray-200 flex items-center justify-center">
+                    {pricingPlans.find(p => p.id === selectedPlan)?.icon}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {pricingPlans.find(p => p.id === selectedPlan)?.name}
+                    </h3>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-semibold text-gray-900">
                         {selectedPlan === 'enterprise' 
-                          ? 'Custom pricing - Contact sales'
-                          : `${formatCurrency(pricingPlans.find(p => p.id === selectedPlan)?.price || 0)}/${pricingPlans.find(p => p.id === selectedPlan)?.interval}`
+                          ? 'Custom Pricing'
+                          : formatCurrency(pricingPlans.find(p => p.id === selectedPlan)?.price || 0)
                         }
-                      </p>
+                      </span>
+                      {selectedPlan !== 'enterprise' && (
+                        <span className="text-gray-600">
+                          /{pricingPlans.find(p => p.id === selectedPlan)?.interval}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  
-                  {/* Plan Features Preview */}
-                  <div className="space-y-2">
-                    <h5 className="font-semibold text-gray-800 mb-2">What you'll get:</h5>
-                    {selectedPlan === 'starter' && (
-                      <>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                          Up to 1 brand monitored
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                          1 AI platform tracked
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                          Basic analytics dashboard
-                        </div>
-                      </>
-                    )}
-                    {selectedPlan === 'professional' && (
-                      <>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                          Up to 5 brands monitored
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                          All 5+ AI platforms tracked
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                          Up to 50 prompts
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                          Advanced analytics & insights
-                        </div>
-                      </>
-                    )}
-                    {selectedPlan === 'enterprise' && (
-                      <>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                          Unlimited brands monitored
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                          All AI platforms + custom integrations
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                          Custom analytics & reporting
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                          Dedicated account manager
-                        </div>
-                      </>
-                    )}
-                  </div>
                 </div>
-              )}
-              
+                <p className="text-gray-600 text-sm">
+                  {pricingPlans.find(p => p.id === selectedPlan)?.description}
+                </p>
+              </div>
+
+              {/* Current Plan Status */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                  <span className="text-sm font-medium text-gray-700">Current Plan</span>
+                </div>
+                <p className="text-sm text-gray-600">
+                  You're currently on the <span className="font-medium">{subscription.plan}</span> plan.
+                  {selectedPlan === 'enterprise' 
+                    ? ' Contact sales to discuss enterprise options.'
+                    : ` Upgrade to ${pricingPlans.find(p => p.id === selectedPlan)?.name} for additional features.`
+                  }
+                </p>
+              </div>
+
+              {/* Features List */}
+              <div>
+                <h4 className="text-base font-semibold text-gray-900 mb-4">
+                  Plan Features
+                </h4>
+                <div className="space-y-3">
+                  {pricingPlans.find(p => p.id === selectedPlan)?.features.map((feature, index) => (
+                    <div key={index} className="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded-lg">
+                      <CheckCircle className="w-4 h-4 text-gray-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-gray-700">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Action Buttons */}
-              <div className="flex gap-3 justify-end pt-4">
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <Button 
                   variant="outline" 
                   onClick={() => setShowUpgradeDialog(false)}
-                  className="px-6 py-2 border-gray-200 hover:bg-gray-50 transition-colors"
+                  className="flex-1 h-10 text-sm font-medium border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </Button>
                 <Button 
                   onClick={handleConfirmUpgrade}
-                  className={`px-8 py-2 font-semibold transition-all duration-300 transform hover:scale-105 ${
+                  className={`flex-1 h-10 text-sm font-medium ${
                     selectedPlan === 'enterprise'
-                      ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-lg hover:shadow-orange-500/25'
-                      : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg hover:shadow-purple-500/25'
+                      ? 'bg-gray-900 hover:bg-gray-800 text-white'
+                      : 'bg-gray-900 hover:bg-gray-800 text-white'
                   }`}
                 >
-                  <span className="flex items-center gap-2">
-                    {selectedPlan === 'enterprise' ? (
-                      <>
-                        <Star className="w-4 h-4" />
-                        Contact Sales
-                      </>
-                    ) : (
-                      <>
-                        <TrendingUp className="w-4 h-4" />
-                        Confirm Upgrade
-                      </>
-                    )}
-                  </span>
+                  {selectedPlan === 'enterprise' ? (
+                    'Contact Sales'
+                  ) : (
+                    'Confirm Upgrade'
+                  )}
                 </Button>
               </div>
             </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
 

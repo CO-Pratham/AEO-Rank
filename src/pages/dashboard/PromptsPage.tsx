@@ -99,7 +99,7 @@ const PromptsPage = () => {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newPromptText, setNewPromptText] = useState("");
   const [addPromptTab, setAddPromptTab] = useState("single");
-  const [selectedCountry, setSelectedCountry] = useState("IN");
+  const [selectedCountry, setSelectedCountry] = useState("India");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [suggestingLoading, setSuggestingLoading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -230,7 +230,7 @@ const PromptsPage = () => {
       // Reset form
       setNewPromptText("");
       setSelectedTags([]);
-      setSelectedCountry("IN");
+      setSelectedCountry("India");
       setAddDialogOpen(false);
 
       // Refresh the prompts list
@@ -746,7 +746,7 @@ const PromptsPage = () => {
                 <Card className="border-border/40">
                   <CardContent className="p-0">
                     <div className="relative">
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-hidden">
                         <Table>
                           <TableHeader>
                             <TableRow className="hover:bg-transparent">
@@ -760,10 +760,18 @@ const PromptsPage = () => {
                                   onCheckedChange={handleSelectAll}
                                 />
                               </TableHead>
-                              <TableHead className="font-medium text-xs min-w-[300px] sticky left-[40px] bg-background z-10">
+                              <TableHead className="font-medium text-xs min-w-[350px] sticky left-[40px] bg-background z-10 whitespace-nowrap">
                                 Prompt
                               </TableHead>
-
+                              <TableHead className="font-medium text-xs text-center min-w-[100px]">
+                                Visibility
+                              </TableHead>
+                              <TableHead className="font-medium text-xs text-center min-w-[100px]">
+                                Sentiment
+                              </TableHead>
+                              <TableHead className="font-medium text-xs text-center min-w-[100px]">
+                                Position
+                              </TableHead>
                               <TableHead className="font-medium text-xs text-center min-w-[120px]">
                                 Mentions
                               </TableHead>
@@ -814,7 +822,15 @@ const PromptsPage = () => {
                                   <TableCell className="py-3">
                                     <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
                                   </TableCell>
-
+                                  <TableCell className="py-3">
+                                    <div className="h-4 bg-gray-200 rounded animate-pulse mx-auto w-12"></div>
+                                  </TableCell>
+                                  <TableCell className="py-3">
+                                    <div className="h-4 bg-gray-200 rounded animate-pulse mx-auto w-12"></div>
+                                  </TableCell>
+                                  <TableCell className="py-3">
+                                    <div className="h-4 bg-gray-200 rounded animate-pulse mx-auto w-12"></div>
+                                  </TableCell>
                                   <TableCell className="py-3">
                                     <div className="flex items-center justify-center gap-1">
                                       {Array.from({ length: 3 }).map((_, i) => (
@@ -849,7 +865,7 @@ const PromptsPage = () => {
                             ) : filteredActivePrompts.length === 0 ? (
                               <TableRow>
                                 <TableCell
-                                  colSpan={10}
+                                  colSpan={13}
                                   className="text-center py-12 text-muted-foreground"
                                 >
                                   No prompts found. Add a prompt to get started.
@@ -874,7 +890,7 @@ const PromptsPage = () => {
                                       }
                                     />
                                   </TableCell>
-                                  <TableCell className="py-3 sticky left-[40px] bg-background">
+                                  <TableCell className="py-3 sticky left-[40px] bg-background whitespace-nowrap">
                                     <button
                                       onClick={() => {
                                         console.log(
@@ -890,10 +906,47 @@ const PromptsPage = () => {
                                       {prompt.prompt}
                                     </button>
                                   </TableCell>
-
-                                  <TableCell className="py-3">
-                                    <div className="flex items-center justify-center gap-1">
-                                      {prompt.mentions.map((mention, idx) => {
+                                  <TableCell className="text-center py-3">
+                                    <span className="text-sm font-semibold">
+                                      {(() => {
+                                        const value = Number(prompt.visibility);
+                                        return !isNaN(value) && prompt.visibility !== undefined && prompt.visibility !== null
+                                          ? `${Math.round(value)}%`
+                                          : "—";
+                                      })()}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-center py-3">
+                                    {(() => {
+                                      const value = Number(prompt.sentiment);
+                                      return !isNaN(value) && prompt.sentiment !== undefined && prompt.sentiment !== null ? (
+                                        <div className="flex items-center justify-center gap-1">
+                                          <div className="w-0.5 h-3.5 bg-green-500 rounded"></div>
+                                          <span className="text-sm font-medium text-green-600">
+                                            {Math.round(value)}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground">
+                                          —
+                                        </span>
+                                      );
+                                    })()}
+                                  </TableCell>
+                                  <TableCell className="text-center py-3">
+                                    <span className="text-sm font-medium">
+                                      {(() => {
+                                        const value = Number(prompt.position);
+                                        return !isNaN(value) && prompt.position !== undefined && prompt.position !== null
+                                          ? `#${value}`
+                                          : "—";
+                                      })()}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-center py-3">
+                                    {prompt.mentions && prompt.mentions.length > 0 ? (
+                                      <div className="flex items-center justify-center gap-1">
+                                        {prompt.mentions.map((mention, idx) => {
                                         const domain = getDomainForBrand(mention.platform);
                                         const faviconUrl = getFaviconUrl(domain, 32);
                                         return (
@@ -919,6 +972,11 @@ const PromptsPage = () => {
                                         );
                                       })}
                                     </div>
+                                    ) : (
+                                      <span className="text-sm text-muted-foreground">
+                                        —
+                                      </span>
+                                    )}
                                   </TableCell>
                                   <TableCell className="text-center py-3">
                                     <span className="text-sm font-medium">
@@ -1168,7 +1226,7 @@ const PromptsPage = () => {
                 <Card className="border-border/40">
                   <CardContent className="p-0">
                     <div className="relative">
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-hidden">
                         <Table>
                         <TableHeader>
                           <TableRow className="hover:bg-transparent">
@@ -1182,10 +1240,18 @@ const PromptsPage = () => {
                                 onCheckedChange={handleSelectAllInactive}
                               />
                             </TableHead>
-                            <TableHead className="font-medium text-xs min-w-[300px] sticky left-[40px] bg-background z-10">
+                            <TableHead className="font-medium text-xs min-w-[350px] sticky left-[40px] bg-background z-10">
                               Prompt
                             </TableHead>
-
+                            <TableHead className="font-medium text-xs text-center min-w-[100px]">
+                              Visibility
+                            </TableHead>
+                            <TableHead className="font-medium text-xs text-center min-w-[100px]">
+                              Sentiment
+                            </TableHead>
+                            <TableHead className="font-medium text-xs text-center min-w-[100px]">
+                              Position
+                            </TableHead>
                             <TableHead className="font-medium text-xs text-center min-w-[120px]">
                               Mentions
                             </TableHead>
@@ -1245,13 +1311,50 @@ const PromptsPage = () => {
                                   }
                                 />
                               </TableCell>
-                              <TableCell className="py-3 sticky left-[40px] bg-background">
+                              <TableCell className="py-3 sticky left-[40px] bg-background whitespace-nowrap">
                                 <p className="text-sm">{prompt.prompt}</p>
                               </TableCell>
-
-                              <TableCell className="py-3">
-                                <div className="flex items-center justify-center gap-1">
-                                  {prompt.mentions.map((mention, idx) => {
+                              <TableCell className="text-center py-3">
+                                <span className="text-sm font-semibold">
+                                  {(() => {
+                                    const value = Number(prompt.visibility);
+                                    return !isNaN(value) && prompt.visibility !== undefined && prompt.visibility !== null
+                                      ? `${Math.round(value)}%`
+                                      : "—";
+                                  })()}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center py-3">
+                                {(() => {
+                                  const value = Number(prompt.sentiment);
+                                  return !isNaN(value) && prompt.sentiment !== undefined && prompt.sentiment !== null ? (
+                                    <div className="flex items-center justify-center gap-1">
+                                      <div className="w-0.5 h-3.5 bg-green-500 rounded"></div>
+                                      <span className="text-sm font-medium text-green-600">
+                                        {Math.round(value)}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">
+                                      —
+                                    </span>
+                                  );
+                                })()}
+                              </TableCell>
+                              <TableCell className="text-center py-3">
+                                <span className="text-sm font-medium">
+                                  {(() => {
+                                    const value = Number(prompt.position);
+                                    return !isNaN(value) && prompt.position !== undefined && prompt.position !== null
+                                      ? `#${value}`
+                                      : "—";
+                                  })()}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center py-3">
+                                {prompt.mentions && prompt.mentions.length > 0 ? (
+                                  <div className="flex items-center justify-center gap-1">
+                                    {prompt.mentions.map((mention, idx) => {
                                     const domain = getDomainForBrand(mention.platform);
                                     const faviconUrl = getFaviconUrl(domain, 32);
                                     return (
@@ -1277,6 +1380,11 @@ const PromptsPage = () => {
                                     );
                                   })}
                                 </div>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">
+                                    —
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell className="text-center py-3">
                                 <span className="text-sm font-medium">
@@ -1526,60 +1634,192 @@ const PromptsPage = () => {
                         {selectedCountry && (
                           <div className="flex items-center gap-2">
                             <span className="text-lg">
-                              {selectedCountry === "IN" && "🇮🇳"}
-                              {selectedCountry === "US" && "🇺🇸"}
-                              {selectedCountry === "GB" && "🇬🇧"}
-                              {selectedCountry === "CA" && "🇨🇦"}
-                              {selectedCountry === "AU" && "🇦🇺"}
-                              {selectedCountry === "DE" && "🇩🇪"}
+                              {getCountryFlag(selectedCountry)}
                             </span>
-                            <span>
-                              {selectedCountry === "IN" && "India"}
-                              {selectedCountry === "US" && "United States"}
-                              {selectedCountry === "GB" && "United Kingdom"}
-                              {selectedCountry === "CA" && "Canada"}
-                              {selectedCountry === "AU" && "Australia"}
-                              {selectedCountry === "DE" && "Germany"}
-                            </span>
+                            <span>{selectedCountry}</span>
                           </div>
                         )}
                       </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="IN">
+                    <SelectContent className="max-h-[300px]">
+                      <SelectItem value="India">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">🇮🇳</span>
                           <span>India</span>
                         </div>
                       </SelectItem>
-                      <SelectItem value="US">
+                      <SelectItem value="United States">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">🇺🇸</span>
                           <span>United States</span>
                         </div>
                       </SelectItem>
-                      <SelectItem value="GB">
+                      <SelectItem value="United Kingdom">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">🇬🇧</span>
                           <span>United Kingdom</span>
                         </div>
                       </SelectItem>
-                      <SelectItem value="CA">
+                      <SelectItem value="Canada">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">🇨🇦</span>
                           <span>Canada</span>
                         </div>
                       </SelectItem>
-                      <SelectItem value="AU">
+                      <SelectItem value="Australia">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">🇦🇺</span>
                           <span>Australia</span>
                         </div>
                       </SelectItem>
-                      <SelectItem value="DE">
+                      <SelectItem value="Germany">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">🇩🇪</span>
                           <span>Germany</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="France">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇫🇷</span>
+                          <span>France</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Japan">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇯🇵</span>
+                          <span>Japan</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="China">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇨🇳</span>
+                          <span>China</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Brazil">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇧🇷</span>
+                          <span>Brazil</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Mexico">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇲🇽</span>
+                          <span>Mexico</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Spain">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇪🇸</span>
+                          <span>Spain</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Italy">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇮🇹</span>
+                          <span>Italy</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Netherlands">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇳🇱</span>
+                          <span>Netherlands</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Sweden">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇸🇪</span>
+                          <span>Sweden</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Switzerland">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇨🇭</span>
+                          <span>Switzerland</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Singapore">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇸🇬</span>
+                          <span>Singapore</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="South Korea">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇰🇷</span>
+                          <span>South Korea</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Saudi Arabia">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇸🇦</span>
+                          <span>Saudi Arabia</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="United Arab Emirates">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇦🇪</span>
+                          <span>United Arab Emirates</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Nigeria">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇳🇬</span>
+                          <span>Nigeria</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="South Africa">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇿🇦</span>
+                          <span>South Africa</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Pakistan">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇵🇰</span>
+                          <span>Pakistan</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Bangladesh">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇧🇩</span>
+                          <span>Bangladesh</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Indonesia">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇮🇩</span>
+                          <span>Indonesia</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Turkey">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇹🇷</span>
+                          <span>Turkey</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Egypt">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇪🇬</span>
+                          <span>Egypt</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Poland">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇵🇱</span>
+                          <span>Poland</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Argentina">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇦🇷</span>
+                          <span>Argentina</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Thailand">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇹🇭</span>
+                          <span>Thailand</span>
                         </div>
                       </SelectItem>
                     </SelectContent>

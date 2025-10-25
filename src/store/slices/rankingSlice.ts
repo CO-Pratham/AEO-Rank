@@ -4,10 +4,11 @@ interface RankingItem {
   id: string | number;
   brand: string;
   logo?: string;
+  domain?: string;
   visibility: string;
   visibilityValue: number; // For sorting
-  sentiment: number;
-  position: string;
+  sentiment: number | null;
+  position: string | null;
   positionValue: number; // For sorting
   originalPosition?: number; // From backend
 }

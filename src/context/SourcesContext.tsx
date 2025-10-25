@@ -123,9 +123,7 @@ export const SourcesProvider: React.FC<SourcesProviderProps> = ({ children }) =>
           { name: 'UGC', value: 30, color: '#82ca9d' },
           { name: 'Editorial', value: 25, color: '#ffc658' }
         ]);
-        setTopSourcesData([
-          { id: 1, domain: 'example.com', icon: '', used: '50', avgCitations: 5, type: 'Corporate' }
-        ]);
+        setTopSourcesData([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -147,10 +145,15 @@ export const SourcesProvider: React.FC<SourcesProviderProps> = ({ children }) =>
     try {
       const path = window.location?.pathname || "";
       if (path.startsWith('/dashboard')) {
+        console.log('🔄 SourcesContext: Fetching sources data...');
         fetchSources();
+      } else {
+        console.log('⏹️ SourcesContext: Not on dashboard route, stopping loading');
+        setLoading(false);
       }
     } catch {
-      // In non-browser environments, skip auto-fetch
+      console.log('⏹️ SourcesContext: Error in useEffect, stopping loading');
+      setLoading(false);
     }
   }, []);
 
