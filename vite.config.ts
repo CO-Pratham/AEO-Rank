@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  base: "./",
+  base: "/",
   build: {
     // Increase chunk size warning limit to 1000kb
     chunkSizeWarningLimit: 1000,
