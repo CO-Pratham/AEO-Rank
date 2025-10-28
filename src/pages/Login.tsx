@@ -39,7 +39,7 @@ const Login = () => {
           },
           body: JSON.stringify({
             email,
-            baseurl: "https://aeo-frontend-main-branch-main.vercel.app",
+            baseurl: "https://aeo-rank.ai",
           }),
         }
       );
@@ -107,15 +107,17 @@ const Login = () => {
     }
   };
 
-
-
   return (
     <>
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <Link to="/" className="inline-flex items-center space-x-2">
-              <img src="/AEO-Rank.jpeg" alt="AEO Rank Logo" className="w-8 h-8 rounded-sm object-cover" />
+              <img
+                src="/AEO-Rank.jpeg"
+                alt="AEO Rank Logo"
+                className="w-8 h-8 rounded-sm object-cover"
+              />
               <span className="text-2xl font-bold text-foreground">
                 AEORank
               </span>
@@ -125,7 +127,9 @@ const Login = () => {
           <Card>
             <CardHeader>
               <CardTitle>Sign in to your account</CardTitle>
-              <CardDescription>Enter your email to access your dashboard</CardDescription>
+              <CardDescription>
+                Enter your email to access your dashboard
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {verificationSent ? (
